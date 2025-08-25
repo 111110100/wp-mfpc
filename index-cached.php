@@ -31,6 +31,11 @@ $servers = isset( $config['servers'] ) && is_array( $config['servers'] ) && !emp
 $rules = isset( $config['rules'] ) && is_array( $config['rules'] ) ? $config['rules'] : [];
 $default_cache_time = isset( $config['default_cache_time'] ) ? (int) $config['default_cache_time'] : 0; // Default 0 (no cache) if not set
 
+// --- Probabilistic Early Expiration ---
+// To prevent cache stampedes, one process can be chosen to regenerate a cache item
+// shortly before it expires, while others continue to serve the stale content.
+$probabilistic_beta = 10.0; // Higher value means earlier refresh probability. Set to 0 to disable.
+
 // --- Bypass Cookie Configuration ---
 $bypass_cookie_prefixes = isset( $config['bypass_cookies'] ) && is_array( $config['bypass_cookies'] ) ? $config['bypass_cookies'] : [];
 
@@ -172,16 +177,46 @@ if ($cache_bypassed_by_cookie) {
     $html = false; // Ensure we generate fresh content
     $debugMessage = 'Page generated (cache bypassed by cookie) in %f seconds.';
 } elseif ( $memcached && $cacheTime > 0 ) {
-    $html = $memcached->get( $cacheKey );
-    if ($html !== false) {
-        $debugMessage = 'Page retrieved from cache in %f seconds.';
+    $cached_item_raw = $memcached->get( $cacheKey );
+    if ($cached_item_raw !== false) {
+        $cached_item = @unserialize($cached_item_raw);
+
+        if (is_array($cached_item) && isset($cached_item['html'], $cached_item['generated_at'])) {
+            $html = $cached_item['html'];
+            $generated_at = $cached_item['generated_at'];
+
+            // Probabilistic early expiration check. A beta of 0 disables this feature.
+            if ($probabilistic_beta > 0) {
+                $random_float = mt_rand() / mt_getrandmax();
+                // The formula is: (time() - generated_at) > TTL - beta * -log(rand)
+                // We check the inverse: if it's NOT time to regenerate, it's a hit.
+                // This also avoids a log(0) warning, as if $random_float is 0, the condition is false and we regenerate.
+                if ($random_float > 0 && (time() - $generated_at) <= ($cacheTime - ($probabilistic_beta * -log($random_float)))) {
+                    // It's a hit.
+                    $debugMessage = 'Page retrieved from cache in %f seconds.';
+                } else {
+                    // This request will regenerate the cache. Other concurrent requests will likely get a different
+                    // random number, pass the check, and be served the stale content from this item.
+                    $html = false; // Treat as a miss to trigger regeneration.
+                    $debugMessage = 'Page generated (stale cache, probabilistic refresh) in %f seconds.';
+                }
+            } else {
+                // Probabilistic check disabled.
+                $debugMessage = 'Page retrieved from cache in %f seconds.';
+            }
+        } else {
+            // Invalid cache format, treat as a miss.
+            $html = false;
+            $debugMessage = 'Page generated (invalid cache format) in %f seconds.';
+        }
     } else {
-        // Item not found or error during get
+        // Item not found in cache.
         $resultCode = $memcached->getResultCode();
         if ($resultCode !== Memcached::RES_NOTFOUND) {
              if ($debug) error_log("Memcached: Error getting key '{$cacheKey}'. Result code: " . $resultCode . " (" . $memcached->getResultMessage() . ")");
         }
-        $debugMessage = 'Page generated (cache miss or error) in %f seconds.';
+        $html = false; // Ensure it's false on miss
+        $debugMessage = 'Page generated (cache miss) in %f seconds.';
     }
 } else {
      $debugMessage = 'Page generated (caching disabled or connection failed) in %f seconds.';
@@ -216,7 +251,11 @@ if ( $html === false ) { // This condition now covers cache miss, disabled, or b
     // --- Cache Storage ---
     // Only try to set cache if NOT bypassed, connection was successful, content exists, and cache time > 0
     if ( !$cache_bypassed_by_cookie && $memcached && $html !== false && $html !== '' && $cacheTime > 0 ) {
-        $set_success = $memcached->set( $cacheKey, $html, $cacheTime );
+        $data_to_cache = [
+            'html' => $html,
+            'generated_at' => time(),
+        ];
+        $set_success = $memcached->set( $cacheKey, serialize($data_to_cache), $cacheTime );
         if (!$set_success && $debug) {
              error_log("Memcached: Failed to set key '{$cacheKey}'. Result code: " . $memcached->getResultCode() . " (" . $memcached->getResultMessage() . ")");
         }
