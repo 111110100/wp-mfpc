@@ -17,6 +17,11 @@ This system provides a robust full-page caching mechanism for WordPress sites us
 *   **Debug Mode**: Optional debug comments in the HTML output showing cache status and generation time.
 *   **Nginx Configuration Generation**: The plugin generates a sample Nginx configuration snippet to help direct requests to `index-cached.php`.
 *   **Server Status Check**: Test connectivity to your Memcached servers directly from the plugin settings page.
+*   **Enterprise Ready**:
+    *   **Environment Configuration**: Support for defining settings via `wp-config.php` constants for immutable deployments.
+    *   **WP-CLI Support**: Manage cache and check status via command line.
+    *   **Site Health Integration**: Built-in checks for Memcached connectivity.
+    *   **Emergency Bypass**: Instantly disable caching via a file trigger.
 
 ## How it Works
 
@@ -185,7 +190,44 @@ You need to modify your Nginx server block configuration for your WordPress site
     *   Generate/update `wp-content/memcached-fp-config.php` (read by `index-cached.php`).
     *   Generate/update `wp-content/memcached_nginx.conf` (for your reference).
 
-### Step 4: Test
+    *   Generate/update `wp-content/memcached_nginx.conf` (for your reference).
+
+### Step 4: Enterprise Configuration (Optional)
+
+For enterprise environments, you can configure the plugin using constants in `wp-config.php`. This overrides database settings.
+
+```php
+define( 'WP_MFPC_DEBUG', true );
+define( 'WP_MFPC_DEFAULT_CACHE_TIME', 3600 );
+define( 'WP_MFPC_SERVERS', [
+    [ 'host' => '127.0.0.1', 'port' => '11211' ],
+] );
+define( 'WP_MFPC_RULES', [
+    [ 'path' => '/', 'time' => 600 ],
+] );
+define( 'WP_MFPC_BYPASS_COOKIES', [
+    'wordpress_logged_in_',
+    'woocommerce_items_in_cart',
+] );
+```
+
+### Step 5: WP-CLI Usage
+
+The plugin supports WP-CLI commands:
+
+*   `wp mfpc flush`: Flush all Memcached servers.
+*   `wp mfpc status`: Check connection status of servers.
+*   `wp mfpc generate-nginx`: Regenerate Nginx config file.
+
+### Step 6: Emergency Bypass
+
+To instantly disable the cache (e.g., during an incident), create a file named `.mfpc-bypass` in your WordPress root directory.
+
+```bash
+touch .mfpc-bypass
+```
+
+### Step 7: Test
 
 1.  Open your website in a browser where you are not logged in (e.g., incognito mode).
 2.  View the page source. If debug is enabled, you should see a comment like:
