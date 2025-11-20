@@ -11,6 +11,8 @@
 
 defined( 'ABSPATH' ) || exit; // Exit if accessed directly
 
+namespace MFPC;
+
 // --- Constants ---
 define( 'MFPC_OPTION_NAME', 'mfpc_settings' );
 define( 'MFPC_PHP_CONFIG_FILE_PATH', WP_CONTENT_DIR . '/memcached-fp-config.php' );
@@ -71,7 +73,7 @@ function mfpc_add_admin_menu_bar( $admin_bar ) {
         'meta' => '',
     ]);
 }
-add_action( 'admin_bar_menu', 'mfpc_add_admin_menu_bar', 100 );
+\add_action( 'admin_bar_menu', __NAMESPACE__ . '\mfpc_add_admin_menu_bar', 100 );
 
 /**
  * Add the admin menu item.
@@ -82,16 +84,17 @@ function mfpc_add_admin_menu() {
         __( 'Memcached Cache', 'mfpc-config' ),
         'manage_options',
         'mfpc-config',
-        'mfpc_options_page_html'
+        'mfpc-config',
+        __NAMESPACE__ . '\mfpc_options_page_html'
     );
 }
-add_action( 'admin_menu', 'mfpc_add_admin_menu' );
+\add_action( 'admin_menu', __NAMESPACE__ . '\mfpc_add_admin_menu' );
 
 /**
  * Register plugin settings.
  */
 function mfpc_settings_init() {
-    register_setting( 'mfpc_options_group', MFPC_OPTION_NAME, 'mfpc_sanitize_settings' );
+    \register_setting( 'mfpc_options_group', MFPC_OPTION_NAME, __NAMESPACE__ . '\mfpc_sanitize_settings' );
 
     // --- General Section ---
     add_settings_section(
@@ -103,32 +106,32 @@ function mfpc_settings_init() {
 
     add_settings_field(
         'mfpc_debug_field',
-        __( 'Enable Debug Output', 'mfpc-config' ),
-        'mfpc_debug_field_html',
+        \__( 'Enable Debug Output', 'mfpc-config' ),
+        __NAMESPACE__ . '\mfpc_debug_field_html',
         'mfpc-config',
         'mfpc_general_section'
     );
 
      add_settings_field(
         'mfpc_default_time_field',
-        __( 'Default Cache Time', 'mfpc-config' ),
-        'mfpc_default_time_field_html',
+        \__( 'Default Cache Time', 'mfpc-config' ),
+        __NAMESPACE__ . '\mfpc_default_time_field_html',
         'mfpc-config',
         'mfpc_general_section'
     );
 
     add_settings_field(
         'mfpc_purge_on_save_field',
-        __( 'Purge Cache on Actions', 'mfpc-config' ), // Renamed for clarity
-        'mfpc_purge_on_save_field_html',
+        \__( 'Purge Cache on Actions', 'mfpc-config' ), // Renamed for clarity
+        __NAMESPACE__ . '\mfpc_purge_on_save_field_html',
         'mfpc-config',
         'mfpc_general_section'
     );
 
     add_settings_field(
         'mfpc_bypass_cookies_field',
-        __( 'Bypass Cache for Cookies', 'mfpc-config' ),
-        'mfpc_bypass_cookies_field_html',
+        \__( 'Bypass Cache for Cookies', 'mfpc-config' ),
+        __NAMESPACE__ . '\mfpc_bypass_cookies_field_html',
         'mfpc-config',
         'mfpc_general_section'
     );
@@ -136,20 +139,20 @@ function mfpc_settings_init() {
     // --- Servers Section ---
     add_settings_section(
         'mfpc_servers_section',
-        __( 'Memcached Servers', 'mfpc-config' ),
-        'mfpc_servers_section_html',
+        \__( 'Memcached Servers', 'mfpc-config' ),
+        __NAMESPACE__ . '\mfpc_servers_section_html',
         'mfpc-config'
     );
 
     // --- Rules Section ---
     add_settings_section(
         'mfpc_rules_section',
-        __( 'Cache Time Rules', 'mfpc-config' ),
-        'mfpc_rules_section_html',
+        \__( 'Cache Time Rules', 'mfpc-config' ),
+        __NAMESPACE__ . '\mfpc_rules_section_html',
         'mfpc-config'
     );
 }
-add_action( 'admin_init', 'mfpc_settings_init' );
+\add_action( 'admin_init', __NAMESPACE__ . '\mfpc_settings_init' );
 
 /**
  * Add settings link to the plugin page.
@@ -159,7 +162,7 @@ function mfpc_settings_link( $links ) {
     array_unshift( $links, $settings_link );
     return $links;
 }
-add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), 'mfpc_settings_link' );
+\add_filter( 'plugin_action_links_' . \plugin_basename( __FILE__ ), __NAMESPACE__ . '\mfpc_settings_link' );
 
 /**
  * Get plugin options with defaults.
@@ -194,13 +197,31 @@ function mfpc_get_options() {
             'bookly_',
         ],
     ];
-    $options = get_option( MFPC_OPTION_NAME, $defaults );
+    $options = \get_option( MFPC_OPTION_NAME, $defaults );
+
+    // --- Enterprise: Environment Overrides ---
+    if ( defined( 'WP_MFPC_DEBUG' ) ) {
+        $options['debug'] = constant( 'WP_MFPC_DEBUG' );
+    }
+    if ( defined( 'WP_MFPC_DEFAULT_CACHE_TIME' ) ) {
+        $options['default_cache_time'] = constant( 'WP_MFPC_DEFAULT_CACHE_TIME' );
+    }
+    if ( defined( 'WP_MFPC_SERVERS' ) && is_array( constant( 'WP_MFPC_SERVERS' ) ) ) {
+        $options['servers'] = constant( 'WP_MFPC_SERVERS' );
+    }
+    if ( defined( 'WP_MFPC_RULES' ) && is_array( constant( 'WP_MFPC_RULES' ) ) ) {
+        $options['rules'] = constant( 'WP_MFPC_RULES' );
+    }
+    if ( defined( 'WP_MFPC_BYPASS_COOKIES' ) && is_array( constant( 'WP_MFPC_BYPASS_COOKIES' ) ) ) {
+        $options['bypass_cookies'] = constant( 'WP_MFPC_BYPASS_COOKIES' );
+    }
+
     // Ensure sub-arrays exist even if saved option is missing them
     $options['servers'] = isset($options['servers']) && is_array($options['servers']) ? $options['servers'] : $defaults['servers'];
     $options['rules'] = isset($options['rules']) && is_array($options['rules']) ? $options['rules'] : $defaults['rules'];
-
-    return wp_parse_args( $options, $defaults );
     $options['bypass_cookies'] = isset($options['bypass_cookies']) && is_array($options['bypass_cookies']) ? $options['bypass_cookies'] : $defaults['bypass_cookies'];
+
+    return \wp_parse_args( $options, $defaults );
 }
 
 
@@ -475,6 +496,9 @@ function mfpc_sanitize_settings( $input ) {
                 $new_input['bypass_cookies'][] = $trimmed_line;
             }
         }
+    } elseif ( isset( $input['bypass_cookies'] ) && is_array( $input['bypass_cookies'] ) ) {
+        // Handle array input (e.g. from CLI)
+        $new_input['bypass_cookies'] = array_map('sanitize_text_field', $input['bypass_cookies']);
     }
     // If the user clears the textarea, $new_input['bypass_cookies'] will be empty, which is the desired behavior.
     // Defaults are handled by mfpc_get_options() when the option is first read.
@@ -654,7 +678,7 @@ function mfpc_enqueue_admin_scripts( $hook_suffix ) {
     ";
     wp_add_inline_style('wp-admin', $custom_css); // Attach to a common admin handle
 }
-add_action( 'admin_enqueue_scripts', 'mfpc_enqueue_admin_scripts' );
+\add_action( 'admin_enqueue_scripts', __NAMESPACE__ . '\mfpc_enqueue_admin_scripts' );
 
 
 // --- Server Status Check ---
@@ -666,7 +690,7 @@ add_action( 'admin_enqueue_scripts', 'mfpc_enqueue_admin_scripts' );
  * @return array Contains 'message' (string) and 'class' (string) for status display.
  */
 function mfpc_check_server_status( $server ) {
-    if ( ! class_exists('Memcached') ) {
+    if ( ! class_exists('\Memcached') ) {
         return ['message' => __( 'Memcached PECL extension not loaded.', 'mfpc-config' ), 'class' => 'status-error'];
     }
 
@@ -687,9 +711,9 @@ function mfpc_check_server_status( $server ) {
         return ['message' => __( 'Invalid port.', 'mfpc-config' ), 'class' => 'status-error'];
     }
 
-    $memcached = new Memcached();
+    $memcached = new \Memcached();
     // Set a short timeout (e.g., 100ms) to avoid blocking the page load for too long
-    $memcached->setOption( Memcached::OPT_CONNECT_TIMEOUT, 100 );
+    $memcached->setOption( \Memcached::OPT_CONNECT_TIMEOUT, 100 );
     // Important: Disable persistent connections for status checks by using a unique ID or new instance
     // $memcached = new Memcached('mfpc_status_check_' . uniqid()); // Alternative if needed
 
@@ -728,14 +752,14 @@ function mfpc_check_server_status( $server ) {
  * @return Memcached|null Memcached object on success, null on failure.
  */
 function mfpc_get_memcached_connection( $servers, $debug = false ) {
-    if ( ! class_exists('Memcached') ) {
+    if ( ! class_exists('\Memcached') ) {
         if ($debug) error_log("MFPC Purge: Memcached class not found.");
         return null;
     }
 
     // Use a persistent ID based on server list to potentially reuse connections
     $persistent_id = 'mfpc_purge_' . md5(serialize($servers));
-    $memcached = new Memcached($persistent_id);
+    $memcached = new \Memcached($persistent_id);
 
     // Check if servers are already added for this persistent connection
     if (count($memcached->getServerList()) > 0) {
@@ -747,13 +771,13 @@ function mfpc_get_memcached_connection( $servers, $debug = false ) {
     }
 
     // Set options before adding servers for persistent connections
-    $memcached->setOption( Memcached::OPT_COMPRESSION, false );
-    $memcached->setOption( Memcached::OPT_BUFFER_WRITES, true );
-    $memcached->setOption( Memcached::OPT_BINARY_PROTOCOL, true );
-    $memcached->setOption( Memcached::OPT_TCP_NODELAY, true);
-    $memcached->setOption( Memcached::OPT_CONNECT_TIMEOUT, 100); // ms
-    $memcached->setOption( Memcached::OPT_POLL_TIMEOUT, 100); // ms
-    $memcached->setOption( Memcached::OPT_RETRY_TIMEOUT, 1); // seconds
+    $memcached->setOption( \Memcached::OPT_COMPRESSION, false );
+    $memcached->setOption( \Memcached::OPT_BUFFER_WRITES, true );
+    $memcached->setOption( \Memcached::OPT_BINARY_PROTOCOL, true );
+    $memcached->setOption( \Memcached::OPT_TCP_NODELAY, true);
+    $memcached->setOption( \Memcached::OPT_CONNECT_TIMEOUT, 100); // ms
+    $memcached->setOption( \Memcached::OPT_POLL_TIMEOUT, 100); // ms
+    $memcached->setOption( \Memcached::OPT_RETRY_TIMEOUT, 1); // seconds
 
     $servers_to_add = [];
     if ( empty( $servers ) ) {
@@ -798,6 +822,16 @@ function mfpc_get_memcached_connection( $servers, $debug = false ) {
         return null; // No valid servers found
     }
 }
+
+// --- WP-CLI Integration ---
+if ( defined( 'WP_CLI' ) && WP_CLI ) {
+    require_once plugin_dir_path( __FILE__ ) . 'includes/class-cli.php';
+}
+
+// --- Health Check Integration ---
+require_once plugin_dir_path( __FILE__ ) . 'includes/class-health-check.php';
+$mfpc_health_check = new Health_Check();
+$mfpc_health_check->init();
 
 /**
  * Central function to perform the actual cache purge for given keys.

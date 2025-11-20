@@ -23,6 +23,15 @@ if ( file_exists( $config_file ) ) {
     }
 }
 
+// --- Enterprise: Emergency Bypass ---
+// Create a file named '.mfpc-bypass' in the same directory to instantly disable caching.
+if (file_exists(__DIR__ . '/.mfpc-bypass')) {
+    $config['debug'] = true; // Force debug to show bypass reason
+    $bypass_reason = "Emergency bypass file found";
+    // We will handle the actual bypass logic by checking this variable or forcing cacheTime to 0
+    $default_cache_time = 0;
+}
+
 // Set defaults from config or hardcoded fallbacks
 $debug = isset( $config['debug'] ) ? (bool) $config['debug'] : false; // Default debug off
 $servers = isset( $config['servers'] ) && is_array( $config['servers'] ) && !empty($config['servers'])
@@ -108,7 +117,7 @@ $connection_success = false;
 // Only attempt connection if caching is potentially enabled (cacheTime > 0 or debug is on)
 if ($cacheTime > 0 || $debug) {
     if (class_exists('Memcached')) {
-        $memcached = new Memcached();
+        $memcached = new \Memcached();
         if (!empty($servers)) {
             foreach ( $servers as $server ) {
                 if ( isset($server['host'], $server['port']) ) {
@@ -146,10 +155,10 @@ if ($cacheTime > 0 || $debug) {
 
         // Configure options if connection was successful
         if ($connection_success) {
-            $memcached->setOption( Memcached::OPT_COMPRESSION, false );
-            $memcached->setOption( Memcached::OPT_BUFFER_WRITES, true );
+            $memcached->setOption( \Memcached::OPT_COMPRESSION, false );
+            $memcached->setOption( \Memcached::OPT_BUFFER_WRITES, true );
             // Binary protocol might fail with sockets, consider conditional setting or removing if using sockets primarily
-            $memcached->setOption( Memcached::OPT_BINARY_PROTOCOL, true );
+            $memcached->setOption( \Memcached::OPT_BINARY_PROTOCOL, true );
         } else {
             if ($debug) error_log("Memcached: No valid servers configured or connection failed.");
             $memcached = null; // Ensure memcached object is null if connection failed
@@ -176,6 +185,9 @@ if (!empty($bypass_cookie_prefixes)) {
 if ($cache_bypassed_by_cookie) {
     $html = false; // Ensure we generate fresh content
     $debugMessage = 'Page generated (cache bypassed by cookie) in %f seconds.';
+} elseif ( isset($bypass_reason) ) {
+    $html = false;
+    $debugMessage = 'Page generated (' . $bypass_reason . ') in %f seconds.';
 } elseif ( $memcached && $cacheTime > 0 ) {
     $cached_item_raw = $memcached->get( $cacheKey );
     if ($cached_item_raw !== false) {
@@ -212,7 +224,7 @@ if ($cache_bypassed_by_cookie) {
     } else {
         // Item not found in cache.
         $resultCode = $memcached->getResultCode();
-        if ($resultCode !== Memcached::RES_NOTFOUND) {
+        if ($resultCode !== \Memcached::RES_NOTFOUND) {
              if ($debug) error_log("Memcached: Error getting key '{$cacheKey}'. Result code: " . $resultCode . " (" . $memcached->getResultMessage() . ")");
         }
         $html = false; // Ensure it's false on miss
