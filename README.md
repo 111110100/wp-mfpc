@@ -247,6 +247,10 @@ touch .mfpc-bypass
 *   **Plugin Conflicts**: Other caching plugins or security plugins might interfere. Test with a minimal set of plugins if you encounter issues.
 *   **Debug Output**: Use the plugin's debug mode and check your PHP error logs and Nginx error logs for clues.
 
+## Professional Services
+
+Need help with installation, configuration, or customization? Contact me for professional services.
+
 ---
 
 This README provides a comprehensive guide to setting up and using your Memcached full-page caching system.
