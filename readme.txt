@@ -249,7 +249,7 @@ touch .mfpc-bypass
 
 ## Professional Services
 
-Need help with installation, configuration, or customization? Contact me for professional services.
+Need help with installation, configuration, or customization? Contact me for professional services at elomibao@gmail.com.
 
 ---
 
