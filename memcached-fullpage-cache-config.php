@@ -169,7 +169,7 @@ function mfpc_settings_link( $links ) {
  */
 function mfpc_get_options() {
     $defaults = [
-        'debug' => false,
+        'debug' => ( defined( 'WP_DEBUG' ) && WP_DEBUG ),
         'default_cache_time' => 3600,
         'purge_on_save' => false, // This now controls purging on save, status change, and delete
         'servers' => [
@@ -198,6 +198,11 @@ function mfpc_get_options() {
         ],
     ];
     $options = \get_option( MFPC_OPTION_NAME, $defaults );
+
+    // Force debug if WP_DEBUG is enabled
+    if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+        $options['debug'] = true;
+    }
 
     // --- Enterprise: Environment Overrides ---
     if ( defined( 'WP_MFPC_DEBUG' ) ) {
@@ -246,6 +251,10 @@ function mfpc_options_page_html() {
             <button type="button" class="button" onclick="window.location.href='<?php echo esc_url(admin_url('options-general.php')); ?>';">
                 <?php esc_html_e( 'Cancel', 'mfpc-config' ); ?>
             </button>
+            <p class="description" style="margin-top: 20px;">
+                <strong><?php esc_html_e( 'Professional Services:', 'mfpc-config' ); ?></strong>
+                <?php esc_html_e( 'Need help with installation, configuration, or customization? Contact me for professional services.', 'mfpc-config' ); ?>
+            </p>
              <?php if ( isset( $_GET['settings-updated'] ) ) : ?>
                 <div id="setting-error-settings_updated" class="notice notice-success settings-error is-dismissible">
                     <p><strong><?php esc_html_e( 'Settings saved.', 'mfpc-config' ); ?></strong></p>

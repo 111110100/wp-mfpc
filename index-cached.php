@@ -33,7 +33,7 @@ if (file_exists(__DIR__ . '/.mfpc-bypass')) {
 }
 
 // Set defaults from config or hardcoded fallbacks
-$debug = isset( $config['debug'] ) ? (bool) $config['debug'] : false; // Default debug off
+$debug = ( defined( 'WP_DEBUG' ) && WP_DEBUG ) || ( isset( $config['debug'] ) ? (bool) $config['debug'] : false );
 $servers = isset( $config['servers'] ) && is_array( $config['servers'] ) && !empty($config['servers'])
            ? $config['servers']
            : [['host' => '127.0.0.1', 'port' => '11211']]; // Default server
@@ -247,6 +247,11 @@ if ( $html === false ) { // This condition now covers cache miss, disabled, or b
         define( 'WP_USE_THEMES', true );
         /** Loads the WordPress Environment and Template */
         require $wp_index_file; // Use require for WordPress core file
+
+        // Update debug status if WP_DEBUG was defined by WordPress
+        if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+            $debug = true;
+        }
     } else {
         // Handle error: WordPress core file missing
         error_log("Error: WordPress index.php not found at {$wp_index_file}.");
