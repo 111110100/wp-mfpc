@@ -12,6 +12,8 @@ $start = microtime(true);
 // --- Configuration Loading ---
 $config_file = __DIR__ . '/wp-content/memcached-fp-config.php'; // Adjust path if needed
 
+define( 'MFPC_CACHE_LOADED', true );
+
 $config = [];
 if ( file_exists( $config_file ) ) {
     // Use error suppression potentially, or add more robust error checking
@@ -34,6 +36,13 @@ if (file_exists(__DIR__ . '/.mfpc-bypass')) {
 
 // Set defaults from config or hardcoded fallbacks
 $debug = ( defined( 'WP_DEBUG' ) && WP_DEBUG ) || ( isset( $config['debug'] ) ? (bool) $config['debug'] : false );
+
+if ( $debug ) {
+    ini_set('display_errors', 1);
+    error_reporting(E_ALL);
+    echo "<!-- MFPC DEBUG: Script Start. Config Loaded. Servers: " . (isset($config['servers']) ? count($config['servers']) : '0') . " -->\n";
+}
+
 $servers = isset( $config['servers'] ) && is_array( $config['servers'] ) && !empty($config['servers'])
            ? $config['servers']
            : [['host' => '127.0.0.1', 'port' => '11211']]; // Default server
@@ -76,6 +85,17 @@ function mfpc_should_bypass_cache(array $bypass_prefixes, bool $debug_mode = fal
 // --- Cache Time & Content Type Determination ---
 $contentType = "Content-Type: text/html";
 $cacheTime = $default_cache_time;
+
+// --- CLI Testing Support ---
+if ( php_sapi_name() === 'cli' ) {
+    if ( ! isset( $_SERVER['HTTP_HOST'] ) ) {
+        $_SERVER['HTTP_HOST'] = 'localhost';
+    }
+    if ( ! isset( $_SERVER['REQUEST_URI'] ) ) {
+        $_SERVER['REQUEST_URI'] = '/';
+    }
+}
+
 $request_uri = $_SERVER['REQUEST_URI'];
 $matched_rule = false;
 
@@ -109,6 +129,10 @@ if ( strstr( $request_uri, '/feed/' ) !== false ) {
 
 // Set Content-Type header
 header( $contentType );
+
+if ( $debug ) {
+    echo "<!-- MFPC DEBUG: Headers sent. Cache Time: $cacheTime -->\n";
+}
 
 // --- Memcached Connection ---
 $memcached = null; // Initialize as null
@@ -190,6 +214,9 @@ if ($cache_bypassed_by_cookie) {
     $debugMessage = 'Page generated (' . $bypass_reason . ') in %f seconds.';
 } elseif ( $memcached && $cacheTime > 0 ) {
     $cached_item_raw = $memcached->get( $cacheKey );
+    if ( $debug ) {
+        echo "<!-- MFPC DEBUG: Cache Key: $cacheKey -->\n";
+    }
     if ($cached_item_raw !== false) {
         $cached_item = @unserialize($cached_item_raw);
 
@@ -237,16 +264,24 @@ if ($cache_bypassed_by_cookie) {
 
 // --- Page Generation (if cache miss or disabled) ---
 if ( $html === false ) { // This condition now covers cache miss, disabled, or bypassed
+    if ( $debug ) {
+        echo "<!-- MFPC DEBUG: Cache Miss/Bypass. Loading WordPress... -->\n";
+    }
     ob_start();
 
     // Define WordPress entry point
-    $wp_index_file = __DIR__ . '/index.php';
+    $wp_blog_header = __DIR__ . '/wp-blog-header.php';
 
-    if (file_exists($wp_index_file)) {
+    if (file_exists($wp_blog_header)) {
         // Set flag for WordPress theme loading
         define( 'WP_USE_THEMES', true );
+        // Spoof SCRIPT_FILENAME so WordPress thinks it's running index.php
+        $_SERVER['SCRIPT_FILENAME'] = __DIR__ . '/index.php';
         /** Loads the WordPress Environment and Template */
-        require $wp_index_file; // Use require for WordPress core file
+        if ( $debug ) {
+            echo "<!-- MFPC DEBUG: Require wp-blog-header.php -->\n";
+        }
+        require $wp_blog_header; // Use require for WordPress core file
 
         // Update debug status if WP_DEBUG was defined by WordPress
         if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
@@ -254,7 +289,7 @@ if ( $html === false ) { // This condition now covers cache miss, disabled, or b
         }
     } else {
         // Handle error: WordPress core file missing
-        error_log("Error: WordPress index.php not found at {$wp_index_file}.");
+        error_log("Error: WordPress wp-blog-header.php not found at {$wp_blog_header}.");
         // Output a user-friendly error or trigger a 503
         echo "Error: Site temporarily unavailable.";
         if (!headers_sent()) {
@@ -263,6 +298,9 @@ if ( $html === false ) { // This condition now covers cache miss, disabled, or b
     }
 
     $html = ob_get_contents();
+    if ( $debug ) {
+        echo "<!-- MFPC DEBUG: WP Output Captured. Length: " . strlen($html) . " -->\n";
+    }
     ob_end_clean(); // Clean buffer regardless of WP success/failure
 
     // --- Cache Storage ---
