@@ -68,11 +68,34 @@ function mfpc_add_admin_menu_bar( $admin_bar ) {
     $admin_bar->add_menu([
         'id' => 'mfpc-config',
         'title' => __( 'Memcached Full Page Cache', 'mfpc-config' ),
-        'href' => admin_url( 'options-general.php?page=mfpc-config' ),
+        'href' => admin_url( 'admin.php?page=mfpc-config' ),
         'parent' => null,
         'group' => false,
         'meta' => '',
     ]);
+
+    // Add Page Specific Stats if on frontend
+    if ( ! is_admin() ) {
+        $options = mfpc_get_options();
+        $memcached = mfpc_get_memcached_connection( $options['servers'] );
+        if ( $memcached ) {
+            $host = $_SERVER['HTTP_HOST'] ?? parse_url( home_url(), PHP_URL_HOST );
+            $uri = $_SERVER['REQUEST_URI'];
+            $page_prefix = "mfpc:stats:{$host}:page:" . md5($uri) . ":";
+
+            $hits = (int) $memcached->get( $page_prefix . 'hits' );
+            $misses = (int) $memcached->get( $page_prefix . 'misses' );
+            $total = $hits + $misses;
+            $ratio = $total > 0 ? round( ( $hits / $total ) * 100, 1 ) : 0;
+
+            $admin_bar->add_menu([
+                'id' => 'mfpc-page-stats',
+                'title' => sprintf( __( 'Page: %d Hits, %d Misses (%s%%)', 'mfpc-config' ), $hits, $misses, $ratio ),
+                'parent' => 'mfpc-config',
+                'href' => false,
+            ]);
+        }
+    }
 }
 \add_action( 'admin_bar_menu', __NAMESPACE__ . '\mfpc_add_admin_menu_bar', 100 );
 
@@ -80,12 +103,30 @@ function mfpc_add_admin_menu_bar( $admin_bar ) {
  * Add the admin menu item.
  */
 function mfpc_add_admin_menu() {
-    add_options_page(
-        __( 'Memcached Cache Config', 'mfpc-config' ),
-        __( 'Memcached Cache', 'mfpc-config' ),
+    add_menu_page(
+        __( 'Fullpage Cache Config', 'mfpc-config' ),
+        __( 'Fullpage Cache', 'mfpc-config' ),
+        'manage_options',
+        'mfpc-config',
+        __NAMESPACE__ . '\mfpc_options_page_html',
+        'dashicons-performance'
+    );
+    // Add submenu for Config (to appear as first item)
+    add_submenu_page(
+        'mfpc-config',
+        __( 'Fullpage Cache Config', 'mfpc-config' ),
+        __( 'Config', 'mfpc-config' ),
         'manage_options',
         'mfpc-config',
         __NAMESPACE__ . '\mfpc_options_page_html'
+    );
+    add_submenu_page(
+        'mfpc-config',
+        __( 'Memcached Stats', 'mfpc-config' ),
+        __( 'Stats', 'mfpc-config' ),
+        'manage_options',
+        'mfpc-stats',
+        __NAMESPACE__ . '\mfpc_stats_page_html'
     );
 }
 \add_action( 'admin_menu', __NAMESPACE__ . '\mfpc_add_admin_menu' );
@@ -158,7 +199,7 @@ function mfpc_settings_init() {
  * Add settings link to the plugin page.
  */
 function mfpc_settings_link( $links ) {
-    $settings_link = '<a href="' . esc_url( admin_url( 'options-general.php?page=mfpc-config' ) ) . '">' . __( 'Settings', 'mfpc-config' ) . '</a>';
+    $settings_link = '<a href="' . esc_url( admin_url( 'admin.php?page=mfpc-config' ) ) . '">' . __( 'Settings', 'mfpc-config' ) . '</a>';
     array_unshift( $links, $settings_link );
     return $links;
 }
@@ -242,13 +283,14 @@ function mfpc_options_page_html() {
     ?>
     <div class="wrap">
         <h1><?php echo esc_html( get_admin_page_title() ); ?></h1>
+        <?php mfpc_render_stats_widget(); ?>
         <form action="options.php" method="post">
             <?php
             settings_fields( 'mfpc_options_group' );
             do_settings_sections( 'mfpc-config' );
             submit_button( __( 'Save Settings', 'mfpc-config' ) );
             ?>
-            <button type="button" class="button" onclick="window.location.href='<?php echo esc_url(admin_url('options-general.php')); ?>';">
+            <button type="button" class="button" onclick="window.location.href='<?php echo esc_url(admin_url('admin.php?page=mfpc-config')); ?>';">
                 <?php esc_html_e( 'Cancel', 'mfpc-config' ); ?>
             </button>
             <p class="description" style="margin-top: 20px;">
@@ -305,6 +347,106 @@ function mfpc_options_page_html() {
         </form>
     </div>
     <?php
+}
+
+/**
+ * Render the Stats page.
+ */
+function mfpc_stats_page_html() {
+    if ( ! current_user_can( 'manage_options' ) ) {
+        return;
+    }
+
+    // Handle Reset Action
+    if ( isset($_POST['mfpc_reset_stats']) && check_admin_referer('mfpc_reset_stats_action') ) {
+        mfpc_reset_stats();
+        echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__('Statistics have been reset.', 'mfpc-config') . '</p></div>';
+    }
+
+    ?>
+    <div class="wrap">
+        <h1><?php esc_html_e( 'Memcached Statistics', 'mfpc-config' ); ?></h1>
+        <?php mfpc_render_stats_widget( true ); ?>
+        
+        <form method="post" style="margin-top: 20px;">
+            <?php wp_nonce_field('mfpc_reset_stats_action'); ?>
+            <input type="hidden" name="mfpc_reset_stats" value="1">
+            <?php submit_button( __( 'Reset Stats', 'mfpc-config' ), 'secondary', 'submit', false ); ?>
+        </form>
+    </div>
+    <?php
+}
+
+/**
+ * Helper to render the stats widget/box.
+ *
+ * @param bool $detailed Whether to show detailed server stats.
+ */
+function mfpc_render_stats_widget( $detailed = false ) {
+    $stats = mfpc_get_site_stats();
+    ?>
+    <div class="card" style="max-width: 100%; margin-top: 20px;">
+        <h2 class="title"><?php esc_html_e( 'Cache Performance', 'mfpc-config' ); ?></h2>
+        <div style="display: flex; flex-wrap: wrap; gap: 20px; margin-top: 10px;">
+            <div style="flex: 1; min-width: 150px; text-align: center; padding: 10px; background: #f0f0f1; border-radius: 4px;">
+                <div style="font-size: 24px; font-weight: bold; color: #2271b1;"><?php echo esc_html( number_format_i18n( $stats['hits'] ) ); ?></div>
+                <div style="color: #646970;"><?php esc_html_e( 'Hits', 'mfpc-config' ); ?></div>
+            </div>
+            <div style="flex: 1; min-width: 150px; text-align: center; padding: 10px; background: #f0f0f1; border-radius: 4px;">
+                <div style="font-size: 24px; font-weight: bold; color: #d63638;"><?php echo esc_html( number_format_i18n( $stats['misses'] ) ); ?></div>
+                <div style="color: #646970;"><?php esc_html_e( 'Misses', 'mfpc-config' ); ?></div>
+            </div>
+            <div style="flex: 1; min-width: 150px; text-align: center; padding: 10px; background: #f0f0f1; border-radius: 4px;">
+                <div style="font-size: 24px; font-weight: bold; color: #00a32a;"><?php echo esc_html( $stats['ratio'] ); ?>%</div>
+                <div style="color: #646970;"><?php esc_html_e( 'Hit Ratio', 'mfpc-config' ); ?></div>
+            </div>
+        </div>
+        <?php if ( $detailed && !empty($stats['server_stats']) ) : ?>
+            <hr style="margin: 20px 0;">
+            <h3><?php esc_html_e( 'Memcached Server Details', 'mfpc-config' ); ?></h3>
+            <table class="widefat striped">
+                <thead>
+                    <tr>
+                        <th><?php esc_html_e( 'Server', 'mfpc-config' ); ?></th>
+                        <th><?php esc_html_e( 'Uptime', 'mfpc-config' ); ?></th>
+                        <th><?php esc_html_e( 'Curr Items', 'mfpc-config' ); ?></th>
+                        <th><?php esc_html_e( 'Bytes Used', 'mfpc-config' ); ?></th>
+                        <th><?php esc_html_e( 'Connections', 'mfpc-config' ); ?></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ( $stats['server_stats'] as $server => $s ) : ?>
+                        <tr>
+                            <td><?php echo esc_html( $server ); ?></td>
+                            <td><?php echo esc_html( mfpc_seconds_to_human_time( $s['uptime'] ?? 0 ) ); ?></td>
+                            <td><?php echo esc_html( number_format_i18n( $s['curr_items'] ?? 0 ) ); ?></td>
+                            <td><?php echo esc_html( size_format( $s['bytes'] ?? 0 ) ); ?></td>
+                            <td><?php echo esc_html( number_format_i18n( $s['curr_connections'] ?? 0 ) ); ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        <?php endif; ?>
+    </div>
+    <?php
+}
+
+/**
+ * Reset stats counters.
+ */
+function mfpc_reset_stats() {
+    $options = mfpc_get_options();
+    $memcached = mfpc_get_memcached_connection( $options['servers'] );
+    if ( $memcached ) {
+        // Use the same prefix logic as index-cached.php
+        // Note: index-cached.php uses $_SERVER['HTTP_HOST']. We assume admin is on same host.
+        $host = $_SERVER['HTTP_HOST'] ?? parse_url( home_url(), PHP_URL_HOST );
+        $prefix = "mfpc:stats:{$host}:";
+        
+        $memcached->delete( $prefix . 'hits' );
+        $memcached->delete( $prefix . 'misses' );
+        // $memcached->delete( $prefix . 'bypass' ); // If we track bypass in future
+    }
 }
 
 /**
@@ -838,6 +980,41 @@ function mfpc_get_memcached_connection( $servers, $debug = false ) {
         if ($debug) error_log("MFPC Purge: No valid servers could be added to the connection (ID: {$persistent_id}).");
         return null; // No valid servers found
     }
+}
+
+/**
+ * Get stats from Memcached.
+ *
+ * @return array Stats data.
+ */
+function mfpc_get_site_stats() {
+    $stats = [
+        'hits' => 0,
+        'misses' => 0,
+        'ratio' => 0,
+        'server_stats' => []
+    ];
+
+    $options = mfpc_get_options();
+    $memcached = mfpc_get_memcached_connection( $options['servers'] );
+
+    if ( $memcached ) {
+        // Use the same prefix logic as index-cached.php
+        $host = $_SERVER['HTTP_HOST'] ?? parse_url( home_url(), PHP_URL_HOST );
+        $prefix = "mfpc:stats:{$host}:";
+
+        $stats['hits'] = (int) $memcached->get( $prefix . 'hits' );
+        $stats['misses'] = (int) $memcached->get( $prefix . 'misses' );
+
+        $total = $stats['hits'] + $stats['misses'];
+        if ( $total > 0 ) {
+            $stats['ratio'] = round( ( $stats['hits'] / $total ) * 100, 2 );
+        }
+
+        $stats['server_stats'] = $memcached->getStats();
+    }
+
+    return $stats;
 }
 
 // --- WP-CLI Integration ---

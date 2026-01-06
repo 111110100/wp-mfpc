@@ -194,6 +194,11 @@ if ($cacheTime > 0 || $debug) {
      if ($debug) error_log("Memcached: Caching disabled for this request (cacheTime=0).");
 }
 
+if ($memcached) {
+    $stats_key_prefix = "mfpc:stats:{$_SERVER['HTTP_HOST']}:";
+    $page_stats_key_prefix = "mfpc:stats:{$_SERVER['HTTP_HOST']}:page:" . md5($request_uri) . ":";
+}
+
 
 // --- Cache Retrieval ---
 $cacheKey = "fullpage:{$_SERVER['HTTP_HOST']}{$request_uri}";
@@ -233,20 +238,28 @@ if ($cache_bypassed_by_cookie) {
                 if ($random_float > 0 && (time() - $generated_at) <= ($cacheTime - ($probabilistic_beta * -log($random_float)))) {
                     // It's a hit.
                     $debugMessage = 'Page retrieved from cache in %f seconds.';
+                    $memcached->increment($stats_key_prefix . 'hits', 1, 1);
+                    $memcached->increment($page_stats_key_prefix . 'hits', 1, 1);
                 } else {
                     // This request will regenerate the cache. Other concurrent requests will likely get a different
                     // random number, pass the check, and be served the stale content from this item.
                     $html = false; // Treat as a miss to trigger regeneration.
                     $debugMessage = 'Page generated (stale cache, probabilistic refresh) in %f seconds.';
+                    $memcached->increment($stats_key_prefix . 'misses', 1, 1);
+                    $memcached->increment($page_stats_key_prefix . 'misses', 1, 1);
                 }
             } else {
                 // Probabilistic check disabled.
                 $debugMessage = 'Page retrieved from cache in %f seconds.';
+                $memcached->increment($stats_key_prefix . 'hits', 1, 1);
+                $memcached->increment($page_stats_key_prefix . 'hits', 1, 1);
             }
         } else {
             // Invalid cache format, treat as a miss.
             $html = false;
             $debugMessage = 'Page generated (invalid cache format) in %f seconds.';
+            $memcached->increment($stats_key_prefix . 'misses', 1, 1);
+            $memcached->increment($page_stats_key_prefix . 'misses', 1, 1);
         }
     } else {
         // Item not found in cache.
@@ -256,6 +269,8 @@ if ($cache_bypassed_by_cookie) {
         }
         $html = false; // Ensure it's false on miss
         $debugMessage = 'Page generated (cache miss) in %f seconds.';
+        $memcached->increment($stats_key_prefix . 'misses', 1, 1);
+        $memcached->increment($page_stats_key_prefix . 'misses', 1, 1);
     }
 } else {
      $debugMessage = 'Page generated (caching disabled or connection failed) in %f seconds.';
