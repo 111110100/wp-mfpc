@@ -278,7 +278,7 @@ function mfpc_options_page_html() {
                             <code>nginx -t && nginx -s reload</code>
                         <?php if ( !file_exists( ABSPATH . 'index-cached.php' ) ) : ?>
                             <p><?php esc_html_e( 'To use the full page cache, you need to copy index-cached.php to your WordPress root directory.', 'mfpc-config' ); ?></p>
-                            <code>sudo cp <?php echo ABSPATH . 'wp-content/plugins/memcached-fullpage-cache-config/index-cached.php'?> <?php echo ABSPATH ?></code>
+                            <code>sudo cp <?php echo ABSPATH . 'wp-content/plugins/wp-mfpc/index-cached.php'?> <?php echo ABSPATH ?></code>
                         <?php endif; ?>
                         <?php delete_transient('mfpc_nginx_config_success'); ?>
                     <?php endif; ?>
