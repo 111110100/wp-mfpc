@@ -205,6 +205,7 @@ $cacheKey = "fullpage:{$_SERVER['HTTP_HOST']}{$request_uri}";
 $html = false;
 $debugMessage = '';
 $cache_bypassed_by_cookie = false;
+$cache_age = 0;
 
 // Check for bypass cookies BEFORE attempting to get from cache
 if (!empty($bypass_cookie_prefixes)) {
@@ -228,6 +229,7 @@ if ($cache_bypassed_by_cookie) {
         if (is_array($cached_item) && isset($cached_item['html'], $cached_item['generated_at'])) {
             $html = $cached_item['html'];
             $generated_at = $cached_item['generated_at'];
+            $cache_age = time() - $generated_at;
 
             // Probabilistic early expiration check. A beta of 0 disables this feature.
             if ($probabilistic_beta > 0) {
@@ -353,6 +355,9 @@ if ( $debug ) {
         $debug_output .= ' | Cache Bypassed by Cookie';
     } else if ($cacheTime > 0) { // Only show TTL if caching was attempted
         $debug_output .= ' | ' . sprintf( $cacheExpiry, $cacheTime );
+    }
+    if ( $html !== false && $cache_age > 0 ) {
+        $debug_output .= ' | Age: ' . $cache_age . 's';
     }
     $debug_output .= ' -->';
     echo $debug_output;
