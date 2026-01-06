@@ -170,6 +170,14 @@ function mfpc_settings_init() {
     );
 
     add_settings_field(
+        'mfpc_purge_method_field',
+        \__( 'Purge Method', 'mfpc-config' ),
+        __NAMESPACE__ . '\mfpc_purge_method_field_html',
+        'mfpc-config',
+        'mfpc_general_section'
+    );
+
+    add_settings_field(
         'mfpc_bypass_cookies_field',
         \__( 'Bypass Cache for Cookies', 'mfpc-config' ),
         __NAMESPACE__ . '\mfpc_bypass_cookies_field_html',
@@ -213,11 +221,11 @@ function mfpc_get_options() {
         'debug' => ( defined( 'WP_DEBUG' ) && WP_DEBUG ),
         'default_cache_time' => 3600,
         'purge_on_save' => false, // This now controls purging on save, status change, and delete
+        'purge_method' => 'specific',
         'servers' => [
             ['host' => '127.0.0.1', 'port' => '11211']
         ],
         'rules' => [
-            ['path' => '/', 'time' => 1800],
             ['path' => '/tag/', 'time' => 86400],
             ['path' => '/category/', 'time' => 86400],
             ['path' => '/author/', 'time' => 86400],
@@ -355,11 +363,6 @@ function mfpc_options_page_html() {
                 </div>
                 <?php delete_transient('mfpc_purge_error'); ?>
             <?php endif; ?>
-            <?php if ( $last_purged = get_transient('mfpc_last_purge_keys') ) : ?>
-                <div class="notice notice-info is-dismissible">
-                    <p><strong><?php esc_html_e( 'Last Purged Keys:', 'mfpc-config' ); ?></strong><br/><code style="display:block; margin-top:5px;"><?php echo nl2br(esc_html( $last_purged )); ?></code></p>
-                </div>
-            <?php endif; ?>
         </form>
     </div>
     <?php
@@ -383,6 +386,12 @@ function mfpc_stats_page_html() {
     <div class="wrap">
         <h1><?php esc_html_e( 'Memcached Statistics', 'mfpc-config' ); ?></h1>
         <?php mfpc_render_stats_widget( true ); ?>
+
+        <?php if ( $last_purged = get_transient('mfpc_last_purge_keys') ) : ?>
+            <div class="notice notice-info is-dismissible" style="margin-top: 20px;">
+                <p><strong><?php esc_html_e( 'Last Purged Keys:', 'mfpc-config' ); ?></strong><br/><code style="display:block; margin-top:5px;"><?php echo nl2br(esc_html( $last_purged )); ?></code></p>
+            </div>
+        <?php endif; ?>
         
         <form method="post" style="margin-top: 20px;">
             <?php wp_nonce_field('mfpc_reset_stats_action'); ?>
@@ -496,6 +505,20 @@ function mfpc_purge_on_save_field_html() {
     <input type="checkbox" id="mfpc_purge_on_save" name="<?php echo esc_attr(MFPC_OPTION_NAME); ?>[purge_on_save]" value="1" <?php checked( 1, $options['purge_on_save'], true ); ?> />
     <label for="mfpc_purge_on_save"><?php esc_html_e( 'Purge cache for the specific post/page and the homepage when a post or page is saved, updated, unpublished, or deleted.', 'mfpc-config' ); ?></label>
     <p class="description"><?php esc_html_e( 'Requires Memcached connection details below to be correct.', 'mfpc-config' ); ?></p>
+    <?php
+}
+
+/**
+ * Render Purge Method select.
+ */
+function mfpc_purge_method_field_html() {
+    $options = mfpc_get_options();
+    ?>
+    <select id="mfpc_purge_method" name="<?php echo esc_attr(MFPC_OPTION_NAME); ?>[purge_method]">
+        <option value="specific" <?php selected( $options['purge_method'], 'specific' ); ?>><?php esc_html_e( 'Purge Specific Pages (Post + Home + Archives)', 'mfpc-config' ); ?></option>
+        <option value="all" <?php selected( $options['purge_method'], 'all' ); ?>><?php esc_html_e( 'Flush Entire Cache', 'mfpc-config' ); ?></option>
+    </select>
+    <p class="description"><?php esc_html_e( 'Select "Flush Entire Cache" if you experience issues with stale content appearing after updates.', 'mfpc-config' ); ?></p>
     <?php
 }
 
@@ -658,6 +681,9 @@ function mfpc_sanitize_settings( $input ) {
 
     // Sanitize Purge on Save
     $new_input['purge_on_save'] = isset( $input['purge_on_save'] ) ? (bool) $input['purge_on_save'] : false;
+
+    // Sanitize Purge Method
+    $new_input['purge_method'] = ( isset( $input['purge_method'] ) && in_array( $input['purge_method'], ['specific', 'all'] ) ) ? $input['purge_method'] : 'specific';
 
     // Sanitize Bypass Cookies
     $new_input['bypass_cookies'] = [];
@@ -1119,8 +1145,8 @@ function mfpc_get_purge_keys_for_post( $post_id_or_object, $debug_mode = false )
     $post_url = get_permalink( $post->ID );
     $home_url = home_url( '/' );
 
-    // Helper to extract host and path safely, defaulting path to '/' if missing
-    $get_host_path = function($url) {
+    // Helper to extract host, path, query safely from a URL string
+    $get_url_parts = function($url) {
         $parts = parse_url($url);
         if (!$parts || !isset($parts['host'])) return false;
         
@@ -1131,89 +1157,124 @@ function mfpc_get_purge_keys_for_post( $post_id_or_object, $debug_mode = false )
         }
 
         $path = isset($parts['path']) ? $parts['path'] : '/';
-        if ( isset( $parts['query'] ) ) {
-            $path .= '?' . $parts['query'];
-        }
-        return ['host' => $host, 'path' => $path, 'query' => isset($parts['query']) ? '?' . $parts['query'] : ''];
+        $query = isset($parts['query']) ? $parts['query'] : '';
+        
+        return ['host' => $host, 'path' => $path, 'query' => $query];
     };
 
-    $post_parts = $get_host_path($post_url);
-    $home_parts = $get_host_path($home_url);
+    // Helper to generate key variations (www/non-www, slash/non-slash)
+    $generate_keys = function($parts) {
+        $keys = [];
+        if (!$parts) return $keys;
 
-    if ( $post_parts ) {
-        $p_host = $post_parts['host'];
-        $p_path = $post_parts['path']; // Includes query if present in original logic, but we separated it above.
-        // Re-construct path with query for the exact match
-        $p_full_path = $p_path . $post_parts['query'];
+        // Handle WWW vs Non-WWW
+        $hosts = [];
+        // $clean_host = preg_replace('/^www\./', '', $parts['host']);
+        // $hosts[] = $clean_host;
+        // $hosts[] = 'www.' . $clean_host;
+        $hosts[] = $parts['host'];
 
-        $keys[] = "fullpage:{$p_host}{$p_full_path}";
-        // Also purge feed for the post (comments feed)
-        $keys[] = "fullpage:{$p_host}{$p_full_path}feed/";
-
-        // --- Add Alternative Slash Version ---
-        // If path is /foo/, add /foo. If path is /foo, add /foo/.
-        // We only do this logic on the path component, then re-append query.
-        $alt_path = ( substr($p_path, -1) === '/' ) ? rtrim($p_path, '/') : $p_path . '/';
-        
-        // Ensure we don't create an empty path (if root was '/') or duplicate
-        if ( $alt_path !== '' && $alt_path !== $p_path ) {
-             $keys[] = "fullpage:{$p_host}{$alt_path}{$post_parts['query']}";
-             $keys[] = "fullpage:{$p_host}{$alt_path}{$post_parts['query']}feed/";
+        // Handle Trailing Slash vs No Trailing Slash
+        $paths = [];
+        $path = $parts['path'];
+        $paths[] = $path;
+        $alt_path = ( substr($path, -1) === '/' ) ? rtrim($path, '/') : $path . '/';
+        if ($alt_path !== '' && $alt_path !== $path) {
+            $paths[] = $alt_path;
         }
-    } else {
-        if ($debug_mode) error_log("MFPC Purge Keys: Could not parse Post URL: {$post_url}");
+
+        $query_suffix = $parts['query'] ? '?' . $parts['query'] : '';
+
+        foreach ($hosts as $h) {
+            foreach ($paths as $p) {
+                $keys[] = "fullpage:{$h}{$p}{$query_suffix}";
+                // Add feed keys for slash-terminated paths (standard WP behavior)
+                if ( substr($p, -1) === '/' ) {
+                    $keys[] = "fullpage:{$h}{$p}feed/";
+                    $keys[] = "fullpage:{$h}{$p}rss/";
+                    $keys[] = "fullpage:{$h}{$p}atom/";
+                }
+            }
+        }
+        return $keys;
+    };
+
+    // 1. Identify Target Hosts (to handle mismatches between config and actual access)
+    $target_hosts = [];
+    
+    $home_parts = $get_url_parts( $home_url );
+    if ( $home_parts ) $target_hosts[] = $home_parts['host'];
+
+    $site_parts = $get_url_parts( site_url() );
+    if ( $site_parts ) $target_hosts[] = $site_parts['host'];
+
+    if ( isset( $_SERVER['HTTP_HOST'] ) ) {
+        $target_hosts[] = $_SERVER['HTTP_HOST'];
+    }
+    
+    $target_hosts = array_unique( $target_hosts );
+
+    // 2. Identify Target Paths (Path + Query)
+    $target_paths = [];
+
+    $add_url = function($url) use (&$target_paths, $get_url_parts) {
+        if ( ! $url ) return;
+        $parts = $get_url_parts( $url );
+        if ( $parts ) {
+            // Use a composite key to avoid duplicates
+            $key = $parts['path'] . '|' . $parts['query'];
+            $target_paths[$key] = ['path' => $parts['path'], 'query' => $parts['query']];
+        }
+    };
+
+    // Add Post URL
+    $add_url( $post_url );
+    
+    // Add Home URL
+    $add_url( $home_url );
+
+    // Add Blog Page (Posts Page) if configured
+    if ( 'page' === get_option( 'show_on_front' ) ) {
+        $page_for_posts = get_option( 'page_for_posts' );
+        if ( $page_for_posts ) $add_url( get_permalink( $page_for_posts ) );
     }
 
-    if ( $home_parts ) {
-        $h_full_path = $home_parts['path'] . $home_parts['query'];
-        $keys[] = "fullpage:{$home_parts['host']}{$h_full_path}";
-        $keys[] = "fullpage:{$home_parts['host']}{$h_full_path}feed/";
-        $keys[] = "fullpage:{$home_parts['host']}{$h_full_path}rss/";
-        $keys[] = "fullpage:{$home_parts['host']}{$h_full_path}atom/";
-    } else {
-        if ($debug_mode) error_log("MFPC Purge Keys: Could not parse Home URL: {$home_url}");
-    }
+    // Add Post Type Archive
+    $add_url( get_post_type_archive_link( $post->post_type ) );
 
-    // --- Add Archive Pages for All Taxonomies (Categories, Tags, etc.) ---
+    // Add Archive Pages for All Taxonomies (Categories, Tags, etc.)
     $taxonomies = get_object_taxonomies( $post->post_type );
     if ( ! empty( $taxonomies ) ) {
         foreach ( $taxonomies as $taxonomy ) {
             $terms = get_the_terms( $post->ID, $taxonomy );
             if ( $terms && ! is_wp_error( $terms ) ) {
                 foreach ( $terms as $term ) {
-                    $term_link = get_term_link( $term );
-                    if ( ! is_wp_error( $term_link ) ) {
-                        $term_parts = $get_host_path( $term_link );
-                        if ( $term_parts ) {
-                            $t_full_path = $term_parts['path'] . $term_parts['query'];
-                            $keys[] = "fullpage:{$term_parts['host']}{$t_full_path}";
-                            $keys[] = "fullpage:{$term_parts['host']}{$t_full_path}feed/";
-                            
-                            $t_alt_path = ( substr($term_parts['path'], -1) === '/' ) ? rtrim($term_parts['path'], '/') : $term_parts['path'] . '/';
-                            if ( $t_alt_path !== '' && $t_alt_path !== $term_parts['path'] ) {
-                                $keys[] = "fullpage:{$term_parts['host']}{$t_alt_path}{$term_parts['query']}";
-                            }
-                        }
-                    }
+                    $add_url( get_term_link( $term ) );
                 }
             }
         }
     }
 
-    // --- Add Author Archive ---
+    // Add Author Archive
     if ( isset($post->post_author) ) {
-        $author_link = get_author_posts_url( $post->post_author );
-        if ( $author_link ) {
-            $author_parts = $get_host_path( $author_link );
-            if ( $author_parts ) {
-                $a_full_path = $author_parts['path'] . $author_parts['query'];
-                $keys[] = "fullpage:{$author_parts['host']}{$a_full_path}";
-                $keys[] = "fullpage:{$author_parts['host']}{$a_full_path}feed/";
-                
-                $a_alt_path = ( substr($author_parts['path'], -1) === '/' ) ? rtrim($author_parts['path'], '/') : $author_parts['path'] . '/';
-                if ( $a_alt_path !== '' && $a_alt_path !== $author_parts['path'] ) {
-                    $keys[] = "fullpage:{$author_parts['host']}{$a_alt_path}{$author_parts['query']}";
-                }
+        $add_url( get_author_posts_url( $post->post_author ) );
+    }
+
+    // 3. Generate Keys for Cross-Product of Hosts and Paths
+    foreach ( $target_hosts as $host ) {
+        foreach ( $target_paths as $path_data ) {
+            $parts = [
+                'host' => $host,
+                'path' => $path_data['path'],
+                'query' => $path_data['query']
+            ];
+            $keys = array_merge( $keys, $generate_keys( $parts ) );
+
+            // Extra safety: If path is root '/', also purge '/index.php'
+            if ( $path_data['path'] === '/' ) {
+                $parts_index = $parts;
+                $parts_index['path'] = '/index.php';
+                $keys = array_merge( $keys, $generate_keys( $parts_index ) );
             }
         }
     }
@@ -1252,8 +1313,12 @@ function mfpc_purge_post_on_save( $post_id, $post ) {
         return;
     }
 
-    $keys_to_purge = mfpc_get_purge_keys_for_post( $post, $options['debug'] );
-    mfpc_perform_purge( $keys_to_purge, $options, 'save' );
+    if ( isset($options['purge_method']) && $options['purge_method'] === 'all' ) {
+        mfpc_purge_all_cache();
+    } else {
+        $keys_to_purge = mfpc_get_purge_keys_for_post( $post, $options['debug'] );
+        mfpc_perform_purge( $keys_to_purge, $options, 'save' );
+    }
 }
 \add_action( 'save_post', __NAMESPACE__ . '\mfpc_purge_post_on_save', 99, 2 );
 
@@ -1283,8 +1348,12 @@ function mfpc_purge_post_on_status_transition( $new_status, $old_status, $post )
         return;
     }
 
-    $keys_to_purge = mfpc_get_purge_keys_for_post( $post, $options['debug'] );
-    mfpc_perform_purge( $keys_to_purge, $options, 'status_change' );
+    if ( isset($options['purge_method']) && $options['purge_method'] === 'all' ) {
+        mfpc_purge_all_cache();
+    } else {
+        $keys_to_purge = mfpc_get_purge_keys_for_post( $post, $options['debug'] );
+        mfpc_perform_purge( $keys_to_purge, $options, 'status_change' );
+    }
 }
 \add_action( 'transition_post_status', __NAMESPACE__ . '\mfpc_purge_post_on_status_transition', 10, 3 );
 
@@ -1318,8 +1387,12 @@ function mfpc_purge_post_on_delete( $post_id ) {
         return;
     }
 
-    $keys_to_purge = mfpc_get_purge_keys_for_post( $post, $options['debug'] );
-    mfpc_perform_purge( $keys_to_purge, $options, 'delete' );
+    if ( isset($options['purge_method']) && $options['purge_method'] === 'all' ) {
+        mfpc_purge_all_cache();
+    } else {
+        $keys_to_purge = mfpc_get_purge_keys_for_post( $post, $options['debug'] );
+        mfpc_perform_purge( $keys_to_purge, $options, 'delete' );
+    }
 }
 \add_action( 'delete_post', __NAMESPACE__ . '\mfpc_purge_post_on_delete', 10, 1 );
 
@@ -1345,13 +1418,19 @@ function mfpc_handle_bulk_action( $redirect_to, $doaction, $post_ids ) {
     }
 
     $options = mfpc_get_options();
-    $count = 0;
-    foreach ( $post_ids as $post_id ) {
-        $post = get_post( $post_id );
-        if ( $post ) {
-            $keys = mfpc_get_purge_keys_for_post( $post, $options['debug'] );
-            mfpc_perform_purge( $keys, $options, 'bulk_purge' );
-            $count++;
+
+    if ( isset($options['purge_method']) && $options['purge_method'] === 'all' ) {
+        mfpc_purge_all_cache();
+        $count = count($post_ids);
+    } else {
+        $count = 0;
+        foreach ( $post_ids as $post_id ) {
+            $post = get_post( $post_id );
+            if ( $post ) {
+                $keys = mfpc_get_purge_keys_for_post( $post, $options['debug'] );
+                mfpc_perform_purge( $keys, $options, 'bulk_purge' );
+                $count++;
+            }
         }
     }
 
@@ -1406,8 +1485,12 @@ function mfpc_handle_row_action_purge() {
     $options = mfpc_get_options();
     $post = get_post( $post_id );
     if ( $post ) {
-        $keys = mfpc_get_purge_keys_for_post( $post, $options['debug'] );
-        mfpc_perform_purge( $keys, $options, 'row_action_purge' );
+        if ( isset($options['purge_method']) && $options['purge_method'] === 'all' ) {
+            mfpc_purge_all_cache();
+        } else {
+            $keys = mfpc_get_purge_keys_for_post( $post, $options['debug'] );
+            mfpc_perform_purge( $keys, $options, 'row_action_purge' );
+        }
     }
 
     $redirect_url = remove_query_arg( ['action', 'post_id', '_wpnonce'], wp_get_referer() );
