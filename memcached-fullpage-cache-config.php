@@ -95,6 +95,21 @@ function mfpc_add_admin_menu_bar( $admin_bar ) {
                 'href' => false,
             ]);
         }
+
+        // Add Purge Page link
+        $object_id = get_queried_object_id();
+        if ( $object_id && get_post( $object_id ) ) {
+            $url = wp_nonce_url(
+                admin_url( 'admin.php?action=mfpc_purge_current_page&post_id=' . $object_id ),
+                'mfpc_purge_current_page_' . $object_id
+            );
+            $admin_bar->add_menu([
+                'id' => 'mfpc-purge-current',
+                'title' => __( 'Purge Page', 'mfpc-config' ),
+                'href' => $url,
+                'parent' => 'mfpc-config',
+            ]);
+        }
     }
 }
 \add_action( 'admin_bar_menu', __NAMESPACE__ . '\mfpc_add_admin_menu_bar', 100 );
@@ -1499,6 +1514,33 @@ function mfpc_handle_row_action_purge() {
     exit;
 }
 add_action( 'admin_action_mfpc_purge_post', __NAMESPACE__ . '\mfpc_handle_row_action_purge' );
+
+/**
+ * Handle purge current page via admin bar.
+ */
+function mfpc_handle_purge_current_page() {
+    $post_id = isset( $_GET['post_id'] ) ? intval( $_GET['post_id'] ) : 0;
+    check_admin_referer( 'mfpc_purge_current_page_' . $post_id );
+
+    if ( ! current_user_can( 'edit_post', $post_id ) ) {
+        wp_die( __( 'You do not have permission to purge this post.', 'mfpc-config' ) );
+    }
+
+    $options = mfpc_get_options();
+    $post = get_post( $post_id );
+    if ( $post ) {
+        if ( isset($options['purge_method']) && $options['purge_method'] === 'all' ) {
+            mfpc_purge_all_cache();
+        } else {
+            $keys = mfpc_get_purge_keys_for_post( $post, $options['debug'] );
+            mfpc_perform_purge( $keys, $options, 'admin_bar_purge' );
+        }
+    }
+
+    wp_redirect( get_permalink( $post_id ) );
+    exit;
+}
+add_action( 'admin_action_mfpc_purge_current_page', __NAMESPACE__ . '\mfpc_handle_purge_current_page' );
 
 // --- Uninstall Hook ---
 /**
