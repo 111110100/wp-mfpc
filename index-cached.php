@@ -224,12 +224,25 @@ if ($cache_bypassed_by_cookie) {
         echo "<!-- MFPC DEBUG: Cache Key: $cacheKey -->\n";
     }
     if ($cached_item_raw !== false) {
-        $cached_item = @unserialize($cached_item_raw);
+        $generated_at = 0;
+        
+        // Detect legacy serialized format (starts with 'a:')
+        if (strpos($cached_item_raw, 'a:') === 0) {
+            $cached_item = @unserialize($cached_item_raw);
+            if (is_array($cached_item) && isset($cached_item['html'], $cached_item['generated_at'])) {
+                $html = $cached_item['html'];
+                $generated_at = $cached_item['generated_at'];
+            }
+        } else {
+            // Raw HTML format (for Nginx)
+            $html = $cached_item_raw;
+            if (preg_match('/<!-- MFPC_META: (\d+) -->/', $html, $matches)) {
+                $generated_at = (int)$matches[1];
+            }
+        }
 
-        if (is_array($cached_item) && isset($cached_item['html'], $cached_item['generated_at'])) {
-            $html = $cached_item['html'];
-            $generated_at = $cached_item['generated_at'];
-            $cache_age = time() - $generated_at;
+        if ($html !== false) {
+            $cache_age = ($generated_at > 0) ? (time() - $generated_at) : 0;
 
             // Probabilistic early expiration check. A beta of 0 disables this feature.
             if ($probabilistic_beta > 0) {
@@ -323,11 +336,9 @@ if ( $html === false ) { // This condition now covers cache miss, disabled, or b
     // --- Cache Storage ---
     // Only try to set cache if NOT bypassed, connection was successful, content exists, and cache time > 0
     if ( !$cache_bypassed_by_cookie && $memcached && $html !== false && $html !== '' && $cacheTime > 0 ) {
-        $data_to_cache = [
-            'html' => $html,
-            'generated_at' => time(),
-        ];
-        $set_success = $memcached->set( $cacheKey, serialize($data_to_cache), $cacheTime );
+        $generated_at = time();
+        $payload = $html . "\n<!-- MFPC_META: " . $generated_at . " -->";
+        $set_success = $memcached->set( $cacheKey, $payload, $cacheTime );
         if (!$set_success && $debug) {
              error_log("Memcached: Failed to set key '{$cacheKey}'. Result code: " . $memcached->getResultCode() . " (" . $memcached->getResultMessage() . ")");
         }

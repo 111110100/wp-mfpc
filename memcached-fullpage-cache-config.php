@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       Memcached Full Page Cache Config
  * Description:       Provides an admin interface to configure Memcached servers and cache rules for index-cached.php. Also allows purging cache on post save and generates Nginx upstream config.
- * Version:           1.4.0
+ * Version:           1.4.2
  * Author:            Erwin Lomibao/Gemini Code Assist
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
@@ -875,7 +875,7 @@ function mfpc_enqueue_admin_scripts( $hook_suffix ) {
         return;
     }
 
-    wp_enqueue_script( 'mfpc-admin-script', plugin_dir_url( __FILE__ ) . 'admin-script.js', array( 'jquery' ), '1.4.0', true ); // Increment version
+    wp_enqueue_script( 'mfpc-admin-script', plugin_dir_url( __FILE__ ) . 'admin-script.js', array( 'jquery' ), '1.4.2', true ); // Increment version
 
     $script_data = array(
         'optionName' => MFPC_OPTION_NAME,
