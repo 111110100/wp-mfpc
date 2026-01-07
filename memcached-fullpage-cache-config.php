@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       Memcached Full Page Cache Config
  * Description:       Provides an admin interface to configure Memcached servers and cache rules for index-cached.php. Also allows purging cache on post save and generates Nginx upstream config.
- * Version:           1.4.2
+ * Version:           1.4.4
  * Author:            Erwin Lomibao/Gemini Code Assist
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
@@ -81,16 +81,29 @@ function mfpc_add_admin_menu_bar( $admin_bar ) {
         if ( $memcached ) {
             $host = $_SERVER['HTTP_HOST'] ?? parse_url( home_url(), PHP_URL_HOST );
             $uri = $_SERVER['REQUEST_URI'];
+            
+            /* Stats commented out
             $page_prefix = "mfpc:stats:{$host}:page:" . md5($uri) . ":";
-
             $hits = (int) $memcached->get( $page_prefix . 'hits' );
             $misses = (int) $memcached->get( $page_prefix . 'misses' );
             $total = $hits + $misses;
             $ratio = $total > 0 ? round( ( $hits / $total ) * 100, 1 ) : 0;
-
             $admin_bar->add_menu([
                 'id' => 'mfpc-page-stats',
                 'title' => sprintf( __( 'Page: %d Hits, %d Misses (%s%%)', 'mfpc-config' ), $hits, $misses, $ratio ),
+                'parent' => 'mfpc-config',
+                'href' => false,
+            ]);
+            */
+
+            // Check cache status
+            $cacheKey = "fullpage:{$host}{$uri}";
+            $is_cached = ( $memcached->get( $cacheKey ) !== false );
+            $status_text = $is_cached ? __( 'Page: CACHED', 'mfpc-config' ) : __( 'Page: UNCACHED', 'mfpc-config' );
+
+            $admin_bar->add_menu([
+                'id' => 'mfpc-page-status',
+                'title' => $status_text,
                 'parent' => 'mfpc-config',
                 'href' => false,
             ]);
@@ -426,6 +439,7 @@ function mfpc_render_stats_widget( $detailed = false ) {
     $stats = mfpc_get_site_stats();
     ?>
     <div class="card" style="max-width: 100%; margin-top: 20px;">
+        <!-- Cache Performance Stats (Commented out due to inaccuracy with Nginx direct serving)
         <h2 class="title"><?php esc_html_e( 'Cache Performance', 'mfpc-config' ); ?></h2>
         <div style="display: flex; flex-wrap: wrap; gap: 20px; margin-top: 10px;">
             <div style="flex: 1; min-width: 150px; text-align: center; padding: 10px; background: #f0f0f1; border-radius: 4px;">
@@ -441,6 +455,7 @@ function mfpc_render_stats_widget( $detailed = false ) {
                 <div style="color: #646970;"><?php esc_html_e( 'Hit Ratio', 'mfpc-config' ); ?></div>
             </div>
         </div>
+        -->
         <?php if ( $detailed && !empty($stats['server_stats']) ) : ?>
             <hr style="margin: 20px 0;">
             <h3><?php esc_html_e( 'Memcached Server Details', 'mfpc-config' ); ?></h3>
@@ -875,7 +890,7 @@ function mfpc_enqueue_admin_scripts( $hook_suffix ) {
         return;
     }
 
-    wp_enqueue_script( 'mfpc-admin-script', plugin_dir_url( __FILE__ ) . 'admin-script.js', array( 'jquery' ), '1.4.2', true ); // Increment version
+    wp_enqueue_script( 'mfpc-admin-script', plugin_dir_url( __FILE__ ) . 'admin-script.js', array( 'jquery' ), '1.4.4', true ); // Increment version
 
     $script_data = array(
         'optionName' => MFPC_OPTION_NAME,
