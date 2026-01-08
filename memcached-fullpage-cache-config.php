@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       Memcached Full Page Cache Config
  * Description:       Provides an admin interface to configure Memcached servers and cache rules for index-cached.php. Also allows purging cache on post save and generates Nginx upstream config.
- * Version:           1.4.4
+ * Version:           1.5.0
  * Author:            Erwin Lomibao/Gemini Code Assist
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
@@ -82,20 +82,6 @@ function mfpc_add_admin_menu_bar( $admin_bar ) {
             $host = $_SERVER['HTTP_HOST'] ?? parse_url( home_url(), PHP_URL_HOST );
             $uri = $_SERVER['REQUEST_URI'];
             
-            /* Stats commented out
-            $page_prefix = "mfpc:stats:{$host}:page:" . md5($uri) . ":";
-            $hits = (int) $memcached->get( $page_prefix . 'hits' );
-            $misses = (int) $memcached->get( $page_prefix . 'misses' );
-            $total = $hits + $misses;
-            $ratio = $total > 0 ? round( ( $hits / $total ) * 100, 1 ) : 0;
-            $admin_bar->add_menu([
-                'id' => 'mfpc-page-stats',
-                'title' => sprintf( __( 'Page: %d Hits, %d Misses (%s%%)', 'mfpc-config' ), $hits, $misses, $ratio ),
-                'parent' => 'mfpc-config',
-                'href' => false,
-            ]);
-            */
-
             // Check cache status
             $cacheKey = "fullpage:{$host}{$uri}";
             $is_cached = ( $memcached->get( $cacheKey ) !== false );
@@ -198,6 +184,22 @@ function mfpc_settings_init() {
     );
 
     add_settings_field(
+        'mfpc_preload_on_save_field',
+        \__( 'Pre-load Cache', 'mfpc-config' ),
+        __NAMESPACE__ . '\mfpc_preload_on_save_field_html',
+        'mfpc-config',
+        'mfpc_general_section'
+    );
+
+    add_settings_field(
+        'mfpc_lazy_load_field',
+        \__( 'Lazy Load Images/Iframes', 'mfpc-config' ),
+        __NAMESPACE__ . '\mfpc_lazy_load_field_html',
+        'mfpc-config',
+        'mfpc_general_section'
+    );
+
+    add_settings_field(
         'mfpc_purge_method_field',
         \__( 'Purge Method', 'mfpc-config' ),
         __NAMESPACE__ . '\mfpc_purge_method_field_html',
@@ -249,6 +251,8 @@ function mfpc_get_options() {
         'debug' => ( defined( 'WP_DEBUG' ) && WP_DEBUG ),
         'default_cache_time' => 3600,
         'purge_on_save' => false, // This now controls purging on save, status change, and delete
+        'preload_on_save' => false,
+        'lazy_load' => false,
         'purge_method' => 'specific',
         'servers' => [
             ['host' => '127.0.0.1', 'port' => '11211']
@@ -439,23 +443,6 @@ function mfpc_render_stats_widget( $detailed = false ) {
     $stats = mfpc_get_site_stats();
     ?>
     <div class="card" style="max-width: 100%; margin-top: 20px;">
-        <!-- Cache Performance Stats (Commented out due to inaccuracy with Nginx direct serving)
-        <h2 class="title"><?php esc_html_e( 'Cache Performance', 'mfpc-config' ); ?></h2>
-        <div style="display: flex; flex-wrap: wrap; gap: 20px; margin-top: 10px;">
-            <div style="flex: 1; min-width: 150px; text-align: center; padding: 10px; background: #f0f0f1; border-radius: 4px;">
-                <div style="font-size: 24px; font-weight: bold; color: #2271b1;"><?php echo esc_html( number_format_i18n( $stats['hits'] ) ); ?></div>
-                <div style="color: #646970;"><?php esc_html_e( 'Hits', 'mfpc-config' ); ?></div>
-            </div>
-            <div style="flex: 1; min-width: 150px; text-align: center; padding: 10px; background: #f0f0f1; border-radius: 4px;">
-                <div style="font-size: 24px; font-weight: bold; color: #d63638;"><?php echo esc_html( number_format_i18n( $stats['misses'] ) ); ?></div>
-                <div style="color: #646970;"><?php esc_html_e( 'Misses', 'mfpc-config' ); ?></div>
-            </div>
-            <div style="flex: 1; min-width: 150px; text-align: center; padding: 10px; background: #f0f0f1; border-radius: 4px;">
-                <div style="font-size: 24px; font-weight: bold; color: #00a32a;"><?php echo esc_html( $stats['ratio'] ); ?>%</div>
-                <div style="color: #646970;"><?php esc_html_e( 'Hit Ratio', 'mfpc-config' ); ?></div>
-            </div>
-        </div>
-        -->
         <?php if ( $detailed && !empty($stats['server_stats']) ) : ?>
             <hr style="margin: 20px 0;">
             <h3><?php esc_html_e( 'Memcached Server Details', 'mfpc-config' ); ?></h3>
@@ -535,6 +522,28 @@ function mfpc_purge_on_save_field_html() {
     <input type="checkbox" id="mfpc_purge_on_save" name="<?php echo esc_attr(MFPC_OPTION_NAME); ?>[purge_on_save]" value="1" <?php checked( 1, $options['purge_on_save'], true ); ?> />
     <label for="mfpc_purge_on_save"><?php esc_html_e( 'Purge cache for the specific post/page and the homepage when a post or page is saved, updated, unpublished, or deleted.', 'mfpc-config' ); ?></label>
     <p class="description"><?php esc_html_e( 'Requires Memcached connection details below to be correct.', 'mfpc-config' ); ?></p>
+    <?php
+}
+
+/**
+ * Render Pre-load on Save checkbox.
+ */
+function mfpc_preload_on_save_field_html() {
+    $options = mfpc_get_options();
+    ?>
+    <input type="checkbox" id="mfpc_preload_on_save" name="<?php echo esc_attr(MFPC_OPTION_NAME); ?>[preload_on_save]" value="1" <?php checked( 1, !empty($options['preload_on_save']), true ); ?> />
+    <label for="mfpc_preload_on_save"><?php esc_html_e( 'Automatically visit (pre-load) the post and homepage after purging to regenerate the cache.', 'mfpc-config' ); ?></label>
+    <?php
+}
+
+/**
+ * Render Lazy Load checkbox.
+ */
+function mfpc_lazy_load_field_html() {
+    $options = mfpc_get_options();
+    ?>
+    <input type="checkbox" id="mfpc_lazy_load" name="<?php echo esc_attr(MFPC_OPTION_NAME); ?>[lazy_load]" value="1" <?php checked( 1, !empty($options['lazy_load']), true ); ?> />
+    <label for="mfpc_lazy_load"><?php esc_html_e( 'Add native `loading="lazy"` attribute to images and iframes that are missing it (improves Core Web Vitals).', 'mfpc-config' ); ?></label>
     <?php
 }
 
@@ -712,6 +721,10 @@ function mfpc_sanitize_settings( $input ) {
     // Sanitize Purge on Save
     $new_input['purge_on_save'] = isset( $input['purge_on_save'] ) ? (bool) $input['purge_on_save'] : false;
 
+    // Sanitize Pre-load and Lazy Load
+    $new_input['preload_on_save'] = isset( $input['preload_on_save'] ) ? (bool) $input['preload_on_save'] : false;
+    $new_input['lazy_load'] = isset( $input['lazy_load'] ) ? (bool) $input['lazy_load'] : false;
+
     // Sanitize Purge Method
     $new_input['purge_method'] = ( isset( $input['purge_method'] ) && in_array( $input['purge_method'], ['specific', 'all'] ) ) ? $input['purge_method'] : 'specific';
 
@@ -788,6 +801,7 @@ function mfpc_sanitize_settings( $input ) {
     $config_for_php_file = [
         'debug' => $new_input['debug'],
         'default_cache_time' => $new_input['default_cache_time'],
+        'lazy_load' => $new_input['lazy_load'],
         'servers' => $new_input['servers'],
         'rules' => $new_input['rules'],
         'bypass_cookies' => $new_input['bypass_cookies'],
@@ -890,7 +904,7 @@ function mfpc_enqueue_admin_scripts( $hook_suffix ) {
         return;
     }
 
-    wp_enqueue_script( 'mfpc-admin-script', plugin_dir_url( __FILE__ ) . 'admin-script.js', array( 'jquery' ), '1.4.4', true ); // Increment version
+    wp_enqueue_script( 'mfpc-admin-script', plugin_dir_url( __FILE__ ) . 'admin-script.js', array( 'jquery' ), '1.5.0', true ); // Increment version
 
     $script_data = array(
         'optionName' => MFPC_OPTION_NAME,
@@ -1319,6 +1333,23 @@ function mfpc_get_purge_keys_for_post( $post_id_or_object, $debug_mode = false )
     return $keys;
 }
 
+/**
+ * Pre-load (warm) cache for given URLs using non-blocking requests.
+ *
+ * @param array $urls Array of URLs to visit.
+ */
+function mfpc_preload_urls( $urls ) {
+    if ( empty( $urls ) ) return;
+    
+    $urls = array_unique( $urls );
+    foreach ( $urls as $url ) {
+        wp_remote_get( $url, [
+            'blocking' => false,
+            'sslverify' => false,
+            'timeout' => 0.01, // Fire and forget
+        ]);
+    }
+}
 
 /**
  * Purge cache for a specific post and the homepage on save/update.
@@ -1348,6 +1379,10 @@ function mfpc_purge_post_on_save( $post_id, $post ) {
     } else {
         $keys_to_purge = mfpc_get_purge_keys_for_post( $post, $options['debug'] );
         mfpc_perform_purge( $keys_to_purge, $options, 'save' );
+    }
+
+    if ( ! empty( $options['preload_on_save'] ) ) {
+        mfpc_preload_urls( [ get_permalink( $post_id ), home_url( '/' ) ] );
     }
 }
 \add_action( 'save_post', __NAMESPACE__ . '\mfpc_purge_post_on_save', 99, 2 );
@@ -1383,6 +1418,10 @@ function mfpc_purge_post_on_status_transition( $new_status, $old_status, $post )
     } else {
         $keys_to_purge = mfpc_get_purge_keys_for_post( $post, $options['debug'] );
         mfpc_perform_purge( $keys_to_purge, $options, 'status_change' );
+    }
+
+    if ( ! empty( $options['preload_on_save'] ) ) {
+        mfpc_preload_urls( [ get_permalink( $post->ID ), home_url( '/' ) ] );
     }
 }
 \add_action( 'transition_post_status', __NAMESPACE__ . '\mfpc_purge_post_on_status_transition', 10, 3 );
@@ -1422,6 +1461,10 @@ function mfpc_purge_post_on_delete( $post_id ) {
     } else {
         $keys_to_purge = mfpc_get_purge_keys_for_post( $post, $options['debug'] );
         mfpc_perform_purge( $keys_to_purge, $options, 'delete' );
+    }
+
+    if ( ! empty( $options['preload_on_save'] ) ) {
+        mfpc_preload_urls( [ home_url( '/' ) ] ); // Only preload home on delete
     }
 }
 \add_action( 'delete_post', __NAMESPACE__ . '\mfpc_purge_post_on_delete', 10, 1 );
