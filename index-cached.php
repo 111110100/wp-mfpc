@@ -48,6 +48,7 @@ $servers = isset( $config['servers'] ) && is_array( $config['servers'] ) && !emp
            : [['host' => '127.0.0.1', 'port' => '11211']]; // Default server
 $rules = isset( $config['rules'] ) && is_array( $config['rules'] ) ? $config['rules'] : [];
 $default_cache_time = isset( $config['default_cache_time'] ) ? (int) $config['default_cache_time'] : 0; // Default 0 (no cache) if not set
+$lazy_load_enabled = isset( $config['lazy_load'] ) ? (bool) $config['lazy_load'] : false;
 
 // --- Probabilistic Early Expiration ---
 // To prevent cache stampedes, one process can be chosen to regenerate a cache item
@@ -194,12 +195,6 @@ if ($cacheTime > 0 || $debug) {
      if ($debug) error_log("Memcached: Caching disabled for this request (cacheTime=0).");
 }
 
-if ($memcached) {
-    $stats_key_prefix = "mfpc:stats:{$_SERVER['HTTP_HOST']}:";
-    $page_stats_key_prefix = "mfpc:stats:{$_SERVER['HTTP_HOST']}:page:" . md5($request_uri) . ":";
-}
-
-
 // --- Cache Retrieval ---
 $cacheKey = "fullpage:{$_SERVER['HTTP_HOST']}{$request_uri}";
 $html = false;
@@ -253,28 +248,20 @@ if ($cache_bypassed_by_cookie) {
                 if ($random_float > 0 && (time() - $generated_at) <= ($cacheTime - ($probabilistic_beta * -log($random_float)))) {
                     // It's a hit.
                     $debugMessage = 'Page retrieved from cache in %f seconds.';
-                    $memcached->increment($stats_key_prefix . 'hits', 1, 1);
-                    $memcached->increment($page_stats_key_prefix . 'hits', 1, 1);
                 } else {
                     // This request will regenerate the cache. Other concurrent requests will likely get a different
                     // random number, pass the check, and be served the stale content from this item.
                     $html = false; // Treat as a miss to trigger regeneration.
                     $debugMessage = 'Page generated (stale cache, probabilistic refresh) in %f seconds.';
-                    $memcached->increment($stats_key_prefix . 'misses', 1, 1);
-                    $memcached->increment($page_stats_key_prefix . 'misses', 1, 1);
                 }
             } else {
                 // Probabilistic check disabled.
                 $debugMessage = 'Page retrieved from cache in %f seconds.';
-                $memcached->increment($stats_key_prefix . 'hits', 1, 1);
-                $memcached->increment($page_stats_key_prefix . 'hits', 1, 1);
             }
         } else {
             // Invalid cache format, treat as a miss.
             $html = false;
             $debugMessage = 'Page generated (invalid cache format) in %f seconds.';
-            $memcached->increment($stats_key_prefix . 'misses', 1, 1);
-            $memcached->increment($page_stats_key_prefix . 'misses', 1, 1);
         }
     } else {
         // Item not found in cache.
@@ -284,8 +271,6 @@ if ($cache_bypassed_by_cookie) {
         }
         $html = false; // Ensure it's false on miss
         $debugMessage = 'Page generated (cache miss) in %f seconds.';
-        $memcached->increment($stats_key_prefix . 'misses', 1, 1);
-        $memcached->increment($page_stats_key_prefix . 'misses', 1, 1);
     }
 } else {
      $debugMessage = 'Page generated (caching disabled or connection failed) in %f seconds.';
@@ -332,6 +317,32 @@ if ( $html === false ) { // This condition now covers cache miss, disabled, or b
         echo "<!-- MFPC DEBUG: WP Output Captured. Length: " . strlen($html) . " -->\n";
     }
     ob_end_clean(); // Clean buffer regardless of WP success/failure
+
+    // --- Lazy Load Transformation ---
+    if ( $lazy_load_enabled && $html !== false ) {
+        // Add loading="lazy" to img tags that don't have it
+        $html = preg_replace_callback(
+            '/<img\s+([^>]+)>/i',
+            function ($matches) {
+                if (stripos($matches[1], 'loading=') === false) {
+                    return '<img loading="lazy" ' . $matches[1] . '>';
+                }
+                return $matches[0];
+            },
+            $html
+        );
+        // Add loading="lazy" to iframe tags that don't have it
+        $html = preg_replace_callback(
+            '/<iframe\s+([^>]+)>/i',
+            function ($matches) {
+                if (stripos($matches[1], 'loading=') === false) {
+                    return '<iframe loading="lazy" ' . $matches[1] . '>';
+                }
+                return $matches[0];
+            },
+            $html
+        );
+    }
 
     // --- Cache Storage ---
     // Only try to set cache if NOT bypassed, connection was successful, content exists, and cache time > 0
