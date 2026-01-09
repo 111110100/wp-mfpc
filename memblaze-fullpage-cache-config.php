@@ -559,7 +559,7 @@ function mfpc_lazy_load_field_html() {
     $options = mfpc_get_options();
     ?>
     <input type="checkbox" id="mfpc_lazy_load" name="<?php echo esc_attr(MFPC_OPTION_NAME); ?>[lazy_load]" value="1" <?php checked( 1, !empty($options['lazy_load']), true ); ?> />
-    <label for="mfpc_lazy_load"><?php esc_html_e( 'Add native `loading="lazy"` attribute to images and iframes that are missing it (improves Core Web Vitals).', 'mfpc-config' ); ?></label>
+    <label for="mfpc_lazy_load"><?php esc_html_e( 'Add native `loading="lazy"` attribute to images and iframes that are missing it (improves Core Web Vitals) EXPERIMENTAL.', 'mfpc-config' ); ?></label>
     <?php
 }
 
