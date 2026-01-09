@@ -2,9 +2,9 @@
 /**
  * @package index-cached.php
  * @author joseph wynn/erwin lomibao/Gemini Code Assist
- * @version 3.0
- * @license commercial
- * @website https://github.com/111110100/wordpress-memcached-nginx-combo
+ * @version 1.5.1
+ * @license GPLv2
+ * @website https://github.com/111110100/wp-mfpc
  */
 
 $start = microtime(true);
