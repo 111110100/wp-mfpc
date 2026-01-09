@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       Memcached Full Page Cache Config
  * Description:       Provides an admin interface to configure Memcached servers and cache rules for index-cached.php. Also allows purging cache on post save and generates Nginx upstream config.
- * Version:           1.5.0
+ * Version:           1.5.1
  * Author:            Erwin Lomibao/Gemini Code Assist
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
@@ -329,6 +329,22 @@ function mfpc_options_page_html() {
     ?>
     <div class="wrap">
         <h1><?php echo esc_html( get_admin_page_title() ); ?></h1>
+        <?php
+        $server_software = isset($_SERVER['SERVER_SOFTWARE']) ? $_SERVER['SERVER_SOFTWARE'] : '';
+        $is_nginx = (stripos($server_software, 'nginx') !== false);
+        $is_apache = (stripos($server_software, 'apache') !== false) || (stripos($server_software, 'litespeed') !== false);
+        
+        if ( ! $is_nginx ) : ?>
+            <div class="notice notice-warning inline">
+                <p><strong><?php esc_html_e( 'Web Server Warning:', 'mfpc-config' ); ?></strong> <?php esc_html_e( 'Nginx not detected. This plugin is optimized for Nginx.', 'mfpc-config' ); ?></p>
+                <?php if ( $is_apache ) : ?>
+                    <p><?php esc_html_e( 'Apache/LiteSpeed detected. To enable caching, add this to the top of your .htaccess file:', 'mfpc-config' ); ?><br/><code>DirectoryIndex index-cached.php index.php</code></p>
+                    <p><em><?php esc_html_e( 'Note: Requests will be handled by PHP (index-cached.php), which is faster than WordPress but slower than Nginx direct serving.', 'mfpc-config' ); ?></em></p>
+                <?php else : ?>
+                    <p><?php esc_html_e( 'For other web servers, configure your server to use index-cached.php as the default index file.', 'mfpc-config' ); ?></p>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
         <?php mfpc_render_stats_widget(); ?>
         <form action="options.php" method="post">
             <?php
@@ -904,7 +920,7 @@ function mfpc_enqueue_admin_scripts( $hook_suffix ) {
         return;
     }
 
-    wp_enqueue_script( 'mfpc-admin-script', plugin_dir_url( __FILE__ ) . 'admin-script.js', array( 'jquery' ), '1.5.0', true ); // Increment version
+    wp_enqueue_script( 'mfpc-admin-script', plugin_dir_url( __FILE__ ) . 'admin-script.js', array( 'jquery' ), '1.5.1', true ); // Increment version
 
     $script_data = array(
         'optionName' => MFPC_OPTION_NAME,
