@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name:       Memcached Full Page Cache Config
+ * Plugin Name:       MemBlaze Full Page Cache
  * Description:       Provides an admin interface to configure Memcached servers and cache rules for index-cached.php. Also allows purging cache on post save and generates Nginx upstream config.
  * Version:           1.5.1
  * Author:            Erwin Lomibao/Gemini Code Assist
@@ -67,7 +67,7 @@ function mfpc_add_admin_menu_bar( $admin_bar ) {
     }
     $admin_bar->add_menu([
         'id' => 'mfpc-config',
-        'title' => __( 'Memcached Full Page Cache', 'mfpc-config' ),
+        'title' => __( 'MemBlaze Cache', 'mfpc-config' ),
         'href' => admin_url( 'admin.php?page=mfpc-config' ),
         'parent' => null,
         'group' => false,
@@ -118,8 +118,8 @@ function mfpc_add_admin_menu_bar( $admin_bar ) {
  */
 function mfpc_add_admin_menu() {
     add_menu_page(
-        __( 'Fullpage Cache Config', 'mfpc-config' ),
-        __( 'Fullpage Cache', 'mfpc-config' ),
+        __( 'MemBlaze Cache Config', 'mfpc-config' ),
+        __( 'MemBlaze Cache', 'mfpc-config' ),
         'manage_options',
         'mfpc-config',
         __NAMESPACE__ . '\mfpc_options_page_html',
@@ -128,7 +128,7 @@ function mfpc_add_admin_menu() {
     // Add submenu for Config (to appear as first item)
     add_submenu_page(
         'mfpc-config',
-        __( 'Fullpage Cache Config', 'mfpc-config' ),
+        __( 'MemBlaze Cache Config', 'mfpc-config' ),
         __( 'Config', 'mfpc-config' ),
         'manage_options',
         'mfpc-config',
