@@ -84,8 +84,29 @@ function mfpc_add_admin_menu_bar( $admin_bar ) {
             
             // Check cache status
             $cacheKey = "fullpage:{$host}{$uri}";
-            $is_cached = ( $memcached->get( $cacheKey ) !== false );
-            $status_text = $is_cached ? __( 'Page: CACHED', 'mfpc-config' ) : __( 'Page: UNCACHED', 'mfpc-config' );
+            $cached_val = $memcached->get( $cacheKey );
+            $is_cached = ( $cached_val !== false );
+
+            $age_suffix = '';
+            if ( $is_cached ) {
+                $generated_at = 0;
+                if ( is_string( $cached_val ) ) {
+                    if ( strpos( $cached_val, 'a:' ) === 0 ) {
+                        $data = @unserialize( $cached_val );
+                        if ( is_array( $data ) && isset( $data['generated_at'] ) ) {
+                            $generated_at = (int) $data['generated_at'];
+                        }
+                    } elseif ( preg_match( '/<!-- MFPC_META: (\d+) -->/', $cached_val, $matches ) ) {
+                        $generated_at = (int) $matches[1];
+                    }
+                }
+                if ( $generated_at > 0 ) {
+                    $age = time() - $generated_at;
+                    $age_suffix = ", (" . number_format_i18n( $age ) . "s)";
+                }
+            }
+
+            $status_text = $is_cached ? sprintf( __( 'Page: CACHED%s', 'mfpc-config' ), $age_suffix ) : __( 'Page: UNCACHED', 'mfpc-config' );
 
             $admin_bar->add_menu([
                 'id' => 'mfpc-page-status',
@@ -192,6 +213,14 @@ function mfpc_settings_init() {
     );
 
     add_settings_field(
+        'mfpc_pre_cache_recent_field',
+        \__( 'Pre-cache Recent Posts', 'mfpc-config' ),
+        __NAMESPACE__ . '\mfpc_pre_cache_recent_field_html',
+        'mfpc-config',
+        'mfpc_general_section'
+    );
+
+    add_settings_field(
         'mfpc_lazy_load_field',
         \__( 'Lazy Load Images/Iframes', 'mfpc-config' ),
         __NAMESPACE__ . '\mfpc_lazy_load_field_html',
@@ -252,6 +281,7 @@ function mfpc_get_options() {
         'default_cache_time' => 3600,
         'purge_on_save' => false, // This now controls purging on save, status change, and delete
         'preload_on_save' => false,
+        'pre_cache_recent_count' => 0,
         'lazy_load' => false,
         'purge_method' => 'specific',
         'servers' => [
@@ -553,6 +583,17 @@ function mfpc_preload_on_save_field_html() {
 }
 
 /**
+ * Render Pre-cache Recent Posts input.
+ */
+function mfpc_pre_cache_recent_field_html() {
+    $options = mfpc_get_options();
+    ?>
+    <input type="number" min="0" step="1" id="mfpc_pre_cache_recent_count" name="<?php echo esc_attr(MFPC_OPTION_NAME); ?>[pre_cache_recent_count]" value="<?php echo esc_attr( $options['pre_cache_recent_count'] ); ?>" class="small-text" />
+    <p class="description"><?php esc_html_e( 'Number of recent posts/pages to automatically pre-cache (warm up) hourly. Set to 0 to disable.', 'mfpc-config' ); ?></p>
+    <?php
+}
+
+/**
  * Render Lazy Load checkbox.
  */
 function mfpc_lazy_load_field_html() {
@@ -739,6 +780,7 @@ function mfpc_sanitize_settings( $input ) {
 
     // Sanitize Pre-load and Lazy Load
     $new_input['preload_on_save'] = isset( $input['preload_on_save'] ) ? (bool) $input['preload_on_save'] : false;
+    $new_input['pre_cache_recent_count'] = isset( $input['pre_cache_recent_count'] ) ? absint( $input['pre_cache_recent_count'] ) : 0;
     $new_input['lazy_load'] = isset( $input['lazy_load'] ) ? (bool) $input['lazy_load'] : false;
 
     // Sanitize Purge Method
@@ -760,6 +802,16 @@ function mfpc_sanitize_settings( $input ) {
     }
     // If the user clears the textarea, $new_input['bypass_cookies'] will be empty, which is the desired behavior.
     // Defaults are handled by mfpc_get_options() when the option is first read.
+
+    // Handle Cron Schedule for Pre-caching
+    $cron_hook = 'mfpc_scheduled_pre_cache';
+    if ( $new_input['pre_cache_recent_count'] > 0 ) {
+        if ( ! wp_next_scheduled( $cron_hook ) ) {
+            wp_schedule_event( time(), 'hourly', $cron_hook );
+        }
+    } else {
+        wp_clear_scheduled_hook( $cron_hook );
+    }
 
 
     // Sanitize Servers
@@ -1485,6 +1537,58 @@ function mfpc_purge_post_on_delete( $post_id ) {
 }
 \add_action( 'delete_post', __NAMESPACE__ . '\mfpc_purge_post_on_delete', 10, 1 );
 
+/**
+ * Get URLs of recent posts and pages.
+ *
+ * @param int $count Number of items to retrieve.
+ * @return array List of URLs.
+ */
+function mfpc_get_recent_urls( $count ) {
+    if ( $count <= 0 ) return [];
+
+    $args = [
+        'post_type' => ['post', 'page'],
+        'post_status' => 'publish',
+        'posts_per_page' => $count,
+        'orderby' => 'date',
+        'order' => 'DESC',
+        'fields' => 'ids',
+        'no_found_rows' => true,
+        'update_post_meta_cache' => false,
+        'update_post_term_cache' => false,
+    ];
+
+    $query = new \WP_Query( $args );
+    $urls = [];
+
+    if ( $query->have_posts() ) {
+        foreach ( $query->posts as $post_id ) {
+            $urls[] = get_permalink( $post_id );
+        }
+    }
+    
+    // Always include homepage
+    $urls[] = home_url( '/' );
+    
+    return array_unique( $urls );
+}
+
+/**
+ * Execute the scheduled pre-cache event.
+ */
+function mfpc_execute_pre_cache() {
+    $options = mfpc_get_options();
+    $count = isset( $options['pre_cache_recent_count'] ) ? (int) $options['pre_cache_recent_count'] : 0;
+    
+    if ( $count > 0 ) {
+        $urls = mfpc_get_recent_urls( $count );
+        mfpc_preload_urls( $urls );
+        if ( ! empty( $options['debug'] ) ) {
+            error_log( "MFPC Pre-cache: Triggered for {$count} items." );
+        }
+    }
+}
+\add_action( 'mfpc_scheduled_pre_cache', __NAMESPACE__ . '\mfpc_execute_pre_cache' );
 
 // --- Bulk & Row Actions ---
 

@@ -146,6 +146,51 @@ class CLI extends WP_CLI_Command {
     }
 
     /**
+     * Pre-caches (warms) the most recent posts and pages.
+     *
+     * ## OPTIONS
+     *
+     * [<count>]
+     * : Number of recent posts/pages to warm. Defaults to plugin setting.
+     *
+     * ## EXAMPLES
+     *
+     *     wp mfpc warmup
+     *     wp mfpc warmup 50
+     *
+     * @when after_wp_load
+     */
+    public function warmup( $args, $assoc_args ) {
+        $options = mfpc_get_options();
+        $count = isset($args[0]) ? (int)$args[0] : (isset($options['pre_cache_recent_count']) ? (int)$options['pre_cache_recent_count'] : 0);
+
+        if ( $count <= 0 ) {
+            WP_CLI::error( "Please specify a count or configure the 'Pre-cache Recent Posts' setting." );
+        }
+
+        WP_CLI::log( "Fetching {$count} recent items..." );
+        
+        $urls = mfpc_get_recent_urls( $count );
+        
+        if ( empty( $urls ) ) {
+             WP_CLI::warning( "No URLs found to warm." );
+             return;
+        }
+        
+        WP_CLI::log( "Warming up " . count($urls) . " URLs..." );
+        $progress = \WP_CLI\Utils\make_progress_bar( 'Progress', count( $urls ) );
+        
+        foreach ( $urls as $url ) {
+            // Use blocking request for CLI to ensure execution
+            wp_remote_get( $url, [ 'blocking' => true, 'sslverify' => false, 'timeout' => 10, 'user-agent' => 'MFPC-CLI-Warmup/1.0' ] );
+            $progress->tick();
+        }
+        
+        $progress->finish();
+        WP_CLI::success( "Cache warmup complete." );
+    }
+
+    /**
      * Displays available commands.
      *
      * ## EXAMPLES
@@ -158,6 +203,7 @@ class CLI extends WP_CLI_Command {
         WP_CLI::log( "Available commands:" );
         WP_CLI::log( "  wp mfpc flush <all|post|page> [<id>] Flush all cache or specific post/page." );
         WP_CLI::log( "  wp mfpc status                   Check status of Memcached servers." );
+        WP_CLI::log( "  wp mfpc warmup [<count>]         Pre-cache recent posts/pages." );
         WP_CLI::log( "  wp mfpc generate-nginx           Generate Nginx configuration file." );
         WP_CLI::log( "  wp mfpc help                     Display this help message." );
     }
