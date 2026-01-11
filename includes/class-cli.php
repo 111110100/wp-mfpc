@@ -178,15 +178,52 @@ class CLI extends WP_CLI_Command {
         }
         
         WP_CLI::log( "Warming up " . count($urls) . " URLs..." );
-        $progress = \WP_CLI\Utils\make_progress_bar( 'Progress', count( $urls ) );
+
+        $memcached = mfpc_get_memcached_connection( $options['servers'] );
         
         foreach ( $urls as $url ) {
             // Use blocking request for CLI to ensure execution
-            wp_remote_get( $url, [ 'blocking' => true, 'sslverify' => false, 'timeout' => 10, 'user-agent' => 'MFPC-CLI-Warmup/1.0' ] );
-            $progress->tick();
+            $response = wp_remote_get( $url, [ 'blocking' => true, 'sslverify' => false, 'timeout' => 30, 'user-agent' => 'MFPC-CLI-Warmup/1.0' ] );
+
+            $post_id = url_to_postid( $url );
+            $title = $post_id ? get_the_title( $post_id ) : ( $url === home_url( '/' ) ? 'Home' : 'Unknown' );
+            
+            if ( is_wp_error( $response ) ) {
+                WP_CLI::warning( "Failed: $title ($url) - " . $response->get_error_message() );
+                continue;
+            }
+
+            $code = wp_remote_retrieve_response_code( $response );
+            if ( $code !== 200 ) {
+                 WP_CLI::warning( "Failed: $title ($url) - HTTP $code" );
+            }
+
+            $status_msg = "Fetched";
+            // Verify if cached
+            if ( $memcached ) {
+                $parts = parse_url( $url );
+                $host = $parts['host'];
+                if ( isset( $parts['port'] ) && ! in_array( $parts['port'], [ 80, 443 ] ) ) {
+                    $host .= ':' . $parts['port'];
+                }
+                $path = isset( $parts['path'] ) ? $parts['path'] : '/';
+                $query = isset( $parts['query'] ) ? '?' . $parts['query'] : '';
+                $key = "fullpage:{$host}{$path}{$query}";
+
+                if ( $memcached->get( $key ) !== false ) {
+                    $status_msg .= " & Cached";
+                } else {
+                    $status_msg .= " (Miss/Not Cached)";
+                }
+            }
+
+            WP_CLI::log( "Processed: $title ($url) - $status_msg" );
         }
         
-        $progress->finish();
+        if ( $memcached ) {
+            $memcached->quit();
+        }
+        
         WP_CLI::success( "Cache warmup complete." );
     }
 
