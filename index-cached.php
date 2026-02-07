@@ -1,8 +1,8 @@
 <?php
 /**
  * @package index-cached.php
- * @author joseph wynn/erwin lomibao/Gemini Code Assist
- * @version 1.5.1
+ * @author erwin lomibao/Gemini Code Assist
+ * @version 1.5.2
  * @license GPLv2
  * @website https://github.com/111110100/wp-mfpc
  */
