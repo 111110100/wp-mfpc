@@ -12,8 +12,17 @@ This system provides a robust full-page caching mechanism for WordPress sites us
 *   **Multiple Server Support**: Configure one or more Memcached servers (TCP/IP or Unix sockets).
 *   **Automatic Cache Purging**:
     *   Purges cache for individual posts/pages and the homepage when content is saved, updated, or deleted.
-    *   Configurable to only purge for specific post types.
+    *   **Bulk Actions**: Purge cache for multiple posts directly from the WordPress post list.
+    *   **Purge Method**: Choose between precise purging of specific pages or flushing the entire cache on updates.
+*   **Cache Pre-loading (Warmup)**:
+    *   **On Save**: Automatically visits the post and homepage after purging to regenerate the cache.
+    *   **Scheduled**: Automatically pre-cache a specified number of recent posts hourly.
+    *   **WP-CLI**: Command to manually warm up the cache.
+*   **Lazy Load (Experimental)**: Automatically adds `loading="lazy"` attributes to images and iframes to improve Core Web Vitals.
 *   **Cookie-Based Cache Bypass**: Define a list of cookie name prefixes. If a visitor has any of these cookies, the cache will be bypassed for them, ensuring dynamic content for logged-in users or users with specific session cookies (e.g., e-commerce carts).
+*   **Admin Interface & Stats**:
+    *   **Dashboard Stats**: View cache hit/miss ratios and server statistics.
+    *   **Admin Bar**: See cache status of the current page and purge it instantly.
 *   **Debug Mode**: Optional debug comments in the HTML output showing cache status and generation time.
 *   **Nginx Configuration Generation**: The plugin generates a sample Nginx configuration snippet to help direct requests to `index-cached.php`.
 *   **Server Status Check**: Test connectivity to your Memcached servers directly from the plugin settings page.
@@ -176,6 +185,10 @@ You need to modify your Nginx server block configuration for your WordPress site
     *   **Enable Debug**: Check this to add HTML comments at the end of your pages showing cache status (hit/miss, bypass reason) and generation time. Useful for testing.
     *   **Default Cache Time**: Set the default expiration time in seconds for cached pages (e.g., `3600` for 1 hour).
     *   **Purge Cache on Actions**: Enable to automatically clear relevant caches when posts/pages are saved, updated, or deleted.
+    *   **Pre-load Cache**: Automatically visit the post and homepage after purging to regenerate the cache.
+    *   **Pre-cache Recent Posts**: Number of recent posts/pages to automatically pre-cache (warm up) hourly.
+    *   **Lazy Load**: Enable experimental lazy loading for images and iframes.
+    *   **Purge Method**: Select "Purge Specific Pages" (default) or "Flush Entire Cache".
     *   **Bypass Cache for Cookies**: Add cookie name prefixes (one per line) that should cause the cache to be bypassed. Defaults include common WordPress, WooCommerce, and other plugin cookies.
 3.  **Memcached Servers**:
     *   Add your Memcached server(s) by specifying the Host (IP address, hostname, or path to Unix socket) and Port (e.g., `11211`, or `0` for Unix sockets).
@@ -215,8 +228,9 @@ define( 'WP_MFPC_BYPASS_COOKIES', [
 
 The plugin supports WP-CLI commands:
 
-*   `wp mfpc flush`: Flush all Memcached servers.
+*   `wp mfpc flush <all|post|page> [<id>]`: Flush all Memcached servers or specific items.
 *   `wp mfpc status`: Check connection status of servers.
+*   `wp mfpc warmup [<count>]`: Pre-cache recent posts/pages.
 *   `wp mfpc generate-nginx`: Regenerate Nginx config file.
 
 ### Step 6: Emergency Bypass
@@ -233,7 +247,7 @@ touch .mfpc-bypass
 2.  View the page source. If debug is enabled, you should see a comment like:
     `<!-- Page generated (cache miss) in X.XXXXXX seconds. | Cache TTL: YYYY seconds -->`
 3.  Refresh the page. You should now see:
-    `<!-- Page retrieved from cache in X.XXXXXX seconds. | Cache TTL: YYYY seconds -->`
+    `<!-- Page retrieved (cache hit) from nginx/memcached -->`
 4.  Log in to WordPress. Visit a page. You should see a bypass message if your login cookies are in the bypass list:
     `<!-- Page generated (cache bypassed by cookie) in X.XXXXXX seconds. | Cache Bypassed by Cookie -->`
 5.  Test cache purging by editing and saving a post. The cache for that post and the homepage should be cleared.
@@ -252,5 +266,3 @@ touch .mfpc-bypass
 Need help with installation, configuration, or customization? Contact me for professional services at elomibao@gmail.com.
 
 ---
-
-This README provides a comprehensive guide to setting up and using your Memcached full-page caching system.

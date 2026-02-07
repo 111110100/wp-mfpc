@@ -14,8 +14,17 @@ This system provides a robust full-page caching mechanism for WordPress sites us
 *   **Multiple Server Support**: Configure one or more Memcached servers (TCP/IP or Unix sockets).
 *   **Automatic Cache Purging**:
     *   Purges cache for individual posts/pages and the homepage when content is saved, updated, or deleted.
-    *   Configurable to only purge for specific post types.
+    *   **Bulk Actions**: Purge cache for multiple posts directly from the WordPress post list.
+    *   **Purge Method**: Choose between precise purging of specific pages or flushing the entire cache on updates.
+*   **Cache Pre-loading (Warmup)**:
+    *   **On Save**: Automatically visits the post and homepage after purging to regenerate the cache.
+    *   **Scheduled**: Automatically pre-cache a specified number of recent posts hourly.
+    *   **WP-CLI**: Command to manually warm up the cache.
+*   **Lazy Load (Experimental)**: Automatically adds `loading="lazy"` attributes to images and iframes to improve Core Web Vitals.
 *   **Cookie-Based Cache Bypass**: Define a list of cookie name prefixes. If a visitor has any of these cookies, the cache will be bypassed for them, ensuring dynamic content for logged-in users or users with specific session cookies (e.g., e-commerce carts).
+*   **Admin Interface & Stats**:
+    *   **Dashboard Stats**: View server statistics.
+    *   **Admin Bar**: See cache status of the current page and purge it instantly.
 *   **Debug Mode**: Optional debug comments in the HTML output showing cache status and generation time.
 *   **Nginx Configuration Generation**: The plugin generates a sample Nginx configuration snippet to help direct requests to `index-cached.php`.
 *   **Server Status Check**: Test connectivity to your Memcached servers directly from the plugin settings page.
@@ -100,26 +109,80 @@ You need to modify your Nginx server block configuration for your WordPress site
         }
         ```
 
-        You need to change it to prioritize `index-cached.php` for non-static file requests:
+        Add this to `/etc/nginx/conf.d/memcached_upstream.conf`:
 
         ```nginx
         # Place this within your http { ... } block, or include the generated memcached_nginx.conf
-        # upstream memcached_servers {
-        #     server 127.0.0.1:11211;
-        #     # server /var/run/memcached/memcached.sock; # Example for Unix socket
-        # }
+        upstream memcached_servers {
+            server 127.0.0.1:11211;
+            # server /var/run/memcached/memcached.sock; # Example for Unix socket
+        }
+        ```
 
+        You need to change `/etc/nginx/sites-enabled/default` to prioritize `index-cached.php` for non-static file requests:
+
+        ```nginx
         server {
             listen 80;
             server_name example.com;
             root /var/www/html; # Your WordPress root
 
-            # Use index-cached.php as the primary handler
-            index index-cached.php index.php index.html index.htm;
+            # set $cache_flags empty
+            set $cache_flags "";
+
+            # Is the user  in?
+            if ($http_cookie ~* "(comment_author_|wordpress_logged_in_|wp-postpass_)") {
+                set $cache_flags "${cache_flags}C";
+            }
+
+            # Do we have query arguments?
+            if ($args) {
+                set $cache_flags "${cache_flags}Q";
+            }
+
+            # Use index.php by default
+            set $index_file /index.php;
+
+            # Chekc $cache_flags if not empty
+            if ($cache_flags = "") {
+                set $index_file /index-cached.php;
+            }
 
             location / {
-                # Try static files first, then pass to index-cached.php
-                try_files $uri $uri/ /index-cached.php?$args;
+                if ($request_method = POST) {
+                    return 405;
+                }
+
+                if ($request_method = GET) {
+                    return 405;
+                }
+
+                if ($http_cookie ~* "(comment_author_|wordpress_logged_in_|wp-postpass_)") {
+                    return 405;
+                }
+
+                default_type text/html;
+                add_header X-Cache-Status HIT;
+
+                set $memcached_key fullpage:$http_post$request_uri;
+                memcached_pass memcached_servers;
+
+                sub_filter '</html>' '</html>\n<!--Page retrieved (cache hit) from nginx/memcached-->';
+                sub_filter_once on;
+
+                error_page 404 405 502 504 = @nocache;
+            }
+
+            location @nocache {
+                add_header X-Cache-Status MISS;
+                index index.php;
+                try_files $uri $uri/ $index_file?$args;
+            }
+
+            # wp-admin should always use index.php
+            location /wp-admin/ {
+                index index.php;
+                try_files $uri $uri/ /index.php?$args;
             }
 
             # Rule for favicon.ico and robots.txt (optional, but good practice)
@@ -178,6 +241,10 @@ You need to modify your Nginx server block configuration for your WordPress site
     *   **Enable Debug**: Check this to add HTML comments at the end of your pages showing cache status (hit/miss, bypass reason) and generation time. Useful for testing.
     *   **Default Cache Time**: Set the default expiration time in seconds for cached pages (e.g., `3600` for 1 hour).
     *   **Purge Cache on Actions**: Enable to automatically clear relevant caches when posts/pages are saved, updated, or deleted.
+    *   **Pre-load Cache**: Automatically visit the post and homepage after purging to regenerate the cache.
+    *   **Pre-cache Recent Posts**: Number of recent posts/pages to automatically pre-cache (warm up) hourly.
+    *   **Lazy Load**: Enable experimental lazy loading for images and iframes.
+    *   **Purge Method**: Select "Purge Specific Pages" (default) or "Flush Entire Cache".
     *   **Bypass Cache for Cookies**: Add cookie name prefixes (one per line) that should cause the cache to be bypassed. Defaults include common WordPress, WooCommerce, and other plugin cookies.
 3.  **Memcached Servers**:
     *   Add your Memcached server(s) by specifying the Host (IP address, hostname, or path to Unix socket) and Port (e.g., `11211`, or `0` for Unix sockets).
@@ -217,8 +284,9 @@ define( 'WP_MFPC_BYPASS_COOKIES', [
 
 The plugin supports WP-CLI commands:
 
-*   `wp mfpc flush`: Flush all Memcached servers.
+*   `wp mfpc flush <all|post|page> [<id>]`: Flush all Memcached servers or specific items.
 *   `wp mfpc status`: Check connection status of servers.
+*   `wp mfpc warmup [<count>]`: Pre-cache recent posts/pages.
 *   `wp mfpc generate-nginx`: Regenerate Nginx config file.
 
 ### Step 6: Emergency Bypass
@@ -235,7 +303,7 @@ touch .mfpc-bypass
 2.  View the page source. If debug is enabled, you should see a comment like:
     `<!-- Page generated (cache miss) in X.XXXXXX seconds. | Cache TTL: YYYY seconds -->`
 3.  Refresh the page. You should now see:
-    `<!-- Page retrieved from cache in X.XXXXXX seconds. | Cache TTL: YYYY seconds -->`
+    `<!-- Page retrieved (cache hit) from nginx/memcached -->`
 4.  Log in to WordPress. Visit a page. You should see a bypass message if your login cookies are in the bypass list:
     `<!-- Page generated (cache bypassed by cookie) in X.XXXXXX seconds. | Cache Bypassed by Cookie -->`
 5.  Test cache purging by editing and saving a post. The cache for that post and the homepage should be cleared.
@@ -254,5 +322,3 @@ touch .mfpc-bypass
 Need help with installation, configuration, or customization? Contact me for professional services at elomibao@gmail.com
 
 ---
-
-This README provides a comprehensive guide to setting up and using your Memcached full-page caching system.
