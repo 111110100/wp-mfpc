@@ -82,7 +82,7 @@ function mfpc_add_admin_menu_bar( $admin_bar ) {
         if ( $memcached ) {
             $host = $_SERVER['HTTP_HOST'] ?? parse_url( home_url(), PHP_URL_HOST );
             $uri = $_SERVER['REQUEST_URI'];
-            
+
             // Check cache status
             $cacheKey = "fullpage:{$host}{$uri}";
             $cached_val = $memcached->get( $cacheKey );
@@ -364,7 +364,7 @@ function mfpc_options_page_html() {
         $server_software = isset($_SERVER['SERVER_SOFTWARE']) ? $_SERVER['SERVER_SOFTWARE'] : '';
         $is_nginx = (stripos($server_software, 'nginx') !== false);
         $is_apache = (stripos($server_software, 'apache') !== false) || (stripos($server_software, 'litespeed') !== false);
-        
+
         if ( ! $is_nginx ) : ?>
             <div class="notice notice-warning inline">
                 <p><strong><?php esc_html_e( 'Web Server Warning:', 'mfpc-config' ); ?></strong> <?php esc_html_e( 'Nginx not detected. This plugin is optimized for Nginx.', 'mfpc-config' ); ?></p>
@@ -471,7 +471,7 @@ function mfpc_stats_page_html() {
                 <p><strong><?php esc_html_e( 'Last Purged Keys:', 'mfpc-config' ); ?></strong><br/><code style="display:block; margin-top:5px;"><?php echo nl2br(esc_html( $last_purged )); ?></code></p>
             </div>
         <?php endif; ?>
-        
+
         <form method="post" style="margin-top: 20px;">
             <?php wp_nonce_field('mfpc_reset_stats_action'); ?>
             <input type="hidden" name="mfpc_reset_stats" value="1">
@@ -531,7 +531,7 @@ function mfpc_reset_stats() {
         // Note: index-cached.php uses $_SERVER['HTTP_HOST']. We assume admin is on same host.
         $host = $_SERVER['HTTP_HOST'] ?? parse_url( home_url(), PHP_URL_HOST );
         $prefix = "mfpc:stats:{$host}:";
-        
+
         $memcached->delete( $prefix . 'hits' );
         $memcached->delete( $prefix . 'misses' );
         // $memcached->delete( $prefix . 'bypass' ); // If we track bypass in future
@@ -1217,10 +1217,10 @@ function mfpc_perform_purge( $keys_to_purge, $options, $context = 'unknown' ) {
             }
         }
     }
-    
+
     // Store purged keys in transient for admin display (debugging)
     set_transient('mfpc_last_purge_keys', implode("\n", $keys_to_purge), 300);
-    
+
     // No need to quit() persistent connections.
 }
 
@@ -1262,7 +1262,7 @@ function mfpc_get_purge_keys_for_post( $post_id_or_object, $debug_mode = false )
     $get_url_parts = function($url) {
         $parts = parse_url($url);
         if (!$parts || !isset($parts['host'])) return false;
-        
+
         $host = $parts['host'];
         // Append port only if it is set and NOT a standard port (80 or 443)
         if ( isset( $parts['port'] ) && $parts['port'] != 80 && $parts['port'] != 443 ) {
@@ -1271,7 +1271,7 @@ function mfpc_get_purge_keys_for_post( $post_id_or_object, $debug_mode = false )
 
         $path = isset($parts['path']) ? $parts['path'] : '/';
         $query = isset($parts['query']) ? $parts['query'] : '';
-        
+
         return ['host' => $host, 'path' => $path, 'query' => $query];
     };
 
@@ -1314,7 +1314,7 @@ function mfpc_get_purge_keys_for_post( $post_id_or_object, $debug_mode = false )
 
     // 1. Identify Target Hosts (to handle mismatches between config and actual access)
     $target_hosts = [];
-    
+
     $home_parts = $get_url_parts( $home_url );
     if ( $home_parts ) $target_hosts[] = $home_parts['host'];
 
@@ -1324,7 +1324,7 @@ function mfpc_get_purge_keys_for_post( $post_id_or_object, $debug_mode = false )
     if ( isset( $_SERVER['HTTP_HOST'] ) ) {
         $target_hosts[] = $_SERVER['HTTP_HOST'];
     }
-    
+
     $target_hosts = array_unique( $target_hosts );
 
     // 2. Identify Target Paths (Path + Query)
@@ -1342,7 +1342,7 @@ function mfpc_get_purge_keys_for_post( $post_id_or_object, $debug_mode = false )
 
     // Add Post URL
     $add_url( $post_url );
-    
+
     // Add Home URL
     $add_url( $home_url );
 
@@ -1409,7 +1409,7 @@ function mfpc_get_purge_keys_for_post( $post_id_or_object, $debug_mode = false )
  */
 function mfpc_preload_urls( $urls ) {
     if ( empty( $urls ) ) return;
-    
+
     $urls = array_unique( $urls );
     foreach ( $urls as $url ) {
         wp_remote_get( $url, [
@@ -1567,10 +1567,10 @@ function mfpc_get_recent_urls( $count ) {
             $urls[] = get_permalink( $post_id );
         }
     }
-    
+
     // Always include homepage
     $urls[] = home_url( '/' );
-    
+
     return array_unique( $urls );
 }
 
@@ -1580,7 +1580,7 @@ function mfpc_get_recent_urls( $count ) {
 function mfpc_execute_pre_cache() {
     $options = mfpc_get_options();
     $count = isset( $options['pre_cache_recent_count'] ) ? (int) $options['pre_cache_recent_count'] : 0;
-    
+
     if ( $count > 0 ) {
         $urls = mfpc_get_recent_urls( $count );
         mfpc_preload_urls( $urls );

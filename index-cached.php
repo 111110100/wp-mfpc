@@ -220,7 +220,7 @@ if ($cache_bypassed_by_cookie) {
     }
     if ($cached_item_raw !== false) {
         $generated_at = 0;
-        
+
         // Detect legacy serialized format (starts with 'a:')
         if (strpos($cached_item_raw, 'a:') === 0) {
             $cached_item = @unserialize($cached_item_raw);

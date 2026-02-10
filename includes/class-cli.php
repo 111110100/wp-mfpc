@@ -128,12 +128,12 @@ class CLI extends WP_CLI_Command {
      */
     public function generate_nginx() {
         $options = mfpc_get_options();
-        
-        // Call sanitize to trigger generation. 
+
+        // Call sanitize to trigger generation.
         // Note: This does NOT save to DB because we are not calling register_setting's save mechanism,
         // we are just invoking the callback which does the file writing.
         mfpc_sanitize_settings($options);
-        
+
         if ( get_transient('mfpc_nginx_config_success') ) {
              WP_CLI::success( get_transient('mfpc_nginx_config_success') );
              delete_transient('mfpc_nginx_config_success');
@@ -169,25 +169,25 @@ class CLI extends WP_CLI_Command {
         }
 
         WP_CLI::log( "Fetching {$count} recent items..." );
-        
+
         $urls = mfpc_get_recent_urls( $count );
-        
+
         if ( empty( $urls ) ) {
              WP_CLI::warning( "No URLs found to warm." );
              return;
         }
-        
+
         WP_CLI::log( "Warming up " . count($urls) . " URLs..." );
 
         $memcached = mfpc_get_memcached_connection( $options['servers'] );
-        
+
         foreach ( $urls as $url ) {
             // Use blocking request for CLI to ensure execution
             $response = wp_remote_get( $url, [ 'blocking' => true, 'sslverify' => false, 'timeout' => 30, 'user-agent' => 'MFPC-CLI-Warmup/1.0' ] );
 
             $post_id = url_to_postid( $url );
             $title = $post_id ? get_the_title( $post_id ) : ( $url === home_url( '/' ) ? 'Home' : 'Unknown' );
-            
+
             if ( is_wp_error( $response ) ) {
                 WP_CLI::warning( "Failed: $title ($url) - " . $response->get_error_message() );
                 continue;
@@ -219,11 +219,11 @@ class CLI extends WP_CLI_Command {
 
             WP_CLI::log( "Processed: $title ($url) - $status_msg" );
         }
-        
+
         if ( $memcached ) {
             $memcached->quit();
         }
-        
+
         WP_CLI::success( "Cache warmup complete." );
     }
 
