@@ -260,6 +260,14 @@ function mfpc_settings_init() {
         __NAMESPACE__ . '\mfpc_rules_section_html',
         'mfpc-config'
     );
+
+    // --- Content Type Rules Section ---
+    add_settings_section(
+        'mfpc_content_type_rules_section',
+        \__( 'Content Type Rules', 'mfpc-config' ),
+        __NAMESPACE__ . '\mfpc_content_type_rules_section_html',
+        'mfpc-config'
+    );
 }
 \add_action( 'admin_init', __NAMESPACE__ . '\mfpc_settings_init' );
 
@@ -294,6 +302,7 @@ function mfpc_get_options() {
             ['path' => '/author/', 'time' => 86400],
             ['path' => '/search/', 'time' => 86400],
         ],
+        'content_type_rules' => [],
         'bypass_cookies' => [ // Default cookie prefixes
             'comment_',
             'woocommerce_',
@@ -329,6 +338,9 @@ function mfpc_get_options() {
     if ( defined( 'WP_MFPC_RULES' ) && is_array( constant( 'WP_MFPC_RULES' ) ) ) {
         $options['rules'] = constant( 'WP_MFPC_RULES' );
     }
+    if ( defined( 'WP_MFPC_CONTENT_TYPE_RULES' ) && is_array( constant( 'WP_MFPC_CONTENT_TYPE_RULES' ) ) ) {
+        $options['content_type_rules'] = constant( 'WP_MFPC_CONTENT_TYPE_RULES' );
+    }
     if ( defined( 'WP_MFPC_BYPASS_COOKIES' ) && is_array( constant( 'WP_MFPC_BYPASS_COOKIES' ) ) ) {
         $options['bypass_cookies'] = constant( 'WP_MFPC_BYPASS_COOKIES' );
     }
@@ -336,6 +348,7 @@ function mfpc_get_options() {
     // Ensure sub-arrays exist even if saved option is missing them
     $options['servers'] = isset($options['servers']) && is_array($options['servers']) ? $options['servers'] : $defaults['servers'];
     $options['rules'] = isset($options['rules']) && is_array($options['rules']) ? $options['rules'] : $defaults['rules'];
+    $options['content_type_rules'] = isset($options['content_type_rules']) && is_array($options['content_type_rules']) ? $options['content_type_rules'] : $defaults['content_type_rules'];
     $options['bypass_cookies'] = isset($options['bypass_cookies']) && is_array($options['bypass_cookies']) ? $options['bypass_cookies'] : $defaults['bypass_cookies'];
 
     return \wp_parse_args( $options, $defaults );
@@ -567,7 +580,7 @@ function mfpc_purge_on_save_field_html() {
     $options = mfpc_get_options();
     ?>
     <input type="checkbox" id="mfpc_purge_on_save" name="<?php echo esc_attr(MFPC_OPTION_NAME); ?>[purge_on_save]" value="1" <?php checked( 1, $options['purge_on_save'], true ); ?> />
-    <label for="mfpc_purge_on_save"><?php esc_html_e( 'Purge cache for the specific post/page and the homepage when a post or page is saved, updated, unpublished, or deleted.', 'mfpc-config' ); ?></label>
+    <label for="mfpc_purge_on_save"><?php esc_html_e( 'Purge cache for a post and related pages (homepage, archives) when a post is saved/deleted, or when a comment is created/updated.', 'mfpc-config' ); ?></label>
     <p class="description"><?php esc_html_e( 'Requires Memcached connection details below to be correct.', 'mfpc-config' ); ?></p>
     <?php
 }
@@ -761,6 +774,95 @@ function mfpc_rules_section_html() {
      <?php
 }
 
+/**
+ * Render Content Type Rules section.
+ */
+function mfpc_content_type_rules_section_html() {
+    ?>
+    <p><?php esc_html_e( 'Define specific Content-Types for URI paths. Useful for API endpoints or feeds. These rules override the default text/html.', 'mfpc-config' ); ?></p>
+    <table class="wp-list-table widefat fixed striped" id="mfpc-content-type-rules-table">
+        <thead>
+            <tr>
+                <th scope="col" style="width: 45%;"><?php esc_html_e( 'URI Path Contains', 'mfpc-config' ); ?></th>
+                <th scope="col" style="width: 45%;"><?php esc_html_e( 'Content Type', 'mfpc-config' ); ?></th>
+                <th scope="col" style="width: 10%;"><?php esc_html_e( 'Actions', 'mfpc-config' ); ?></th>
+            </tr>
+        </thead>
+        <tbody id="mfpc-content-type-rules-body">
+            <?php
+            $options = mfpc_get_options();
+            $content_types = [
+                'text/html',
+                'text/plain',
+                'application/json',
+                'application/xml',
+                'text/xml',
+                'application/rss+xml',
+                'application/atom+xml'
+            ];
+
+            if ( ! empty( $options['content_type_rules'] ) ) :
+                foreach ( $options['content_type_rules'] as $index => $rule ) :
+                    ?>
+                    <tr class="mfpc-content-type-rule-row">
+                        <td><input type="text" name="<?php echo esc_attr(MFPC_OPTION_NAME); ?>[content_type_rules][<?php echo $index; ?>][path]" value="<?php echo esc_attr( $rule['path'] ); ?>" class="regular-text" required /></td>
+                        <td>
+                            <select name="<?php echo esc_attr(MFPC_OPTION_NAME); ?>[content_type_rules][<?php echo $index; ?>][content_type]">
+                                <?php foreach ( $content_types as $ct ) : ?>
+                                    <option value="<?php echo esc_attr( $ct ); ?>" <?php selected( $rule['content_type'], $ct ); ?>><?php echo esc_html( $ct ); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </td>
+                        <td><button type="button" class="button mfpc-remove-row"><?php esc_html_e( 'Delete', 'mfpc-config' ); ?></button></td>
+                    </tr>
+                    <?php
+                endforeach;
+            endif;
+            ?>
+        </tbody>
+        <tfoot>
+            <tr>
+                <td colspan="3">
+                    <button type="button" class="button" id="mfpc-add-content-type-rule"><?php esc_html_e( 'Add Rule', 'mfpc-config' ); ?></button>
+                </td>
+            </tr>
+        </tfoot>
+    </table>
+
+    <script>
+    jQuery(document).ready(function($) {
+        // Ensure remove works for this table
+        $('#mfpc-content-type-rules-table').on('click', '.mfpc-remove-row', function() {
+            $(this).closest('tr').remove();
+        });
+
+        $('#mfpc-add-content-type-rule').on('click', function() {
+            var index = 0;
+            $('#mfpc-content-type-rules-body tr').each(function() {
+                var inputName = $(this).find('input').attr('name');
+                if (inputName) {
+                    var match = inputName.match(/\[(\d+)\]/);
+                    if (match) {
+                        var idx = parseInt(match[1]);
+                        if (idx >= index) index = idx + 1;
+                    }
+                }
+            });
+            var optionName = '<?php echo MFPC_OPTION_NAME; ?>';
+            var rowHtml = '<tr class="mfpc-content-type-rule-row">' +
+                '<td><input type="text" name="' + optionName + '[content_type_rules][' + index + '][path]" value="" class="regular-text" required /></td>' +
+                '<td><select name="' + optionName + '[content_type_rules][' + index + '][content_type]">' +
+                <?php foreach ( $content_types as $ct ) : ?>'<option value="<?php echo esc_js( $ct ); ?>"><?php echo esc_js( $ct ); ?></option>' +<?php endforeach; ?>
+                '</select></td>' +
+                '<td><button type="button" class="button mfpc-remove-row"><?php esc_html_e( 'Delete', 'mfpc-config' ); ?></button></td>' +
+                '</tr>';
+            $('#mfpc-content-type-rules-body').append(rowHtml);
+        });
+    });
+    </script>
+    <?php
+}
+
 // --- Sanitization and Config Generation ---
 
 /**
@@ -865,6 +967,22 @@ function mfpc_sanitize_settings( $input ) {
          $new_input['rules'] = $defaults['rules'];
     }
 
+    // Sanitize Content Type Rules
+    $new_input['content_type_rules'] = [];
+    if ( isset( $input['content_type_rules'] ) && is_array( $input['content_type_rules'] ) ) {
+        foreach ( $input['content_type_rules'] as $rule ) {
+            if ( isset( $rule['path'] ) && isset( $rule['content_type'] ) ) {
+                $path = sanitize_text_field( trim($rule['path']) );
+                $ct = sanitize_text_field( trim($rule['content_type']) );
+                if ( $path !== '' && $ct !== '' ) {
+                     $new_input['content_type_rules'][] = [
+                        'path' => $path,
+                        'content_type' => $ct,
+                    ];
+                }
+            }
+        }
+    }
 
     // --- Generate PHP Config File (for index-cached.php) ---
     $config_for_php_file = [
@@ -873,6 +991,7 @@ function mfpc_sanitize_settings( $input ) {
         'lazy_load' => $new_input['lazy_load'],
         'servers' => $new_input['servers'],
         'rules' => $new_input['rules'],
+        'content_type_rules' => $new_input['content_type_rules'],
         'bypass_cookies' => $new_input['bypass_cookies'],
     ];
 
@@ -1537,6 +1656,92 @@ function mfpc_purge_post_on_delete( $post_id ) {
     }
 }
 \add_action( 'delete_post', __NAMESPACE__ . '\mfpc_purge_post_on_delete', 10, 1 );
+
+/**
+ * Purges cache for a post when a comment is made, approved, edited, marked as spam or trashed.
+ * This function is designed to be a callback for various comment-related action hooks.
+ *
+ * @param mixed ...$args Arguments passed by the WordPress hook.
+ */
+function mfpc_purge_on_comment( ...$args ) {
+    $comment_id = 0;
+    $current_hook = current_filter();
+    $context = 'comment_activity';
+
+    // Determine the comment ID from the hook's arguments
+    switch ( $current_hook ) {
+        case 'transition_comment_status':
+            // Args: $new_status, $old_status, $comment
+            if ( isset( $args[2] ) && is_a( $args[2], 'WP_Comment' ) ) {
+                $comment_id = $args[2]->comment_ID;
+                $context = 'comment_status_change';
+            }
+            break;
+        case 'comment_post':
+            // Args: $comment_ID, $comment_approved
+            // Only purge for automatically approved comments. Moderated ones are handled by transition_comment_status.
+            if ( isset( $args[1] ) && 1 !== (int) $args[1] ) {
+                return;
+            }
+            $comment_id = (int) $args[0];
+            $context = 'new_comment';
+            break;
+        case 'wp_set_comment_status':
+            // Args: $comment_id, $comment_status
+            if ( isset( $args[0] ) ) {
+                $comment_id = (int) $args[0];
+                $context = 'comment_status_update';
+            }
+            break;
+        case 'edit_comment':
+        case 'delete_comment':
+            // All these hooks pass comment_ID as the first argument.
+            if ( isset( $args[0] ) ) {
+                $comment_id = (int) $args[0];
+                $context = 'comment_' . $current_hook;
+            }
+            break;
+    }
+
+    if ( ! $comment_id ) {
+        return;
+    }
+
+    $options = mfpc_get_options();
+    // Re-use the 'Purge on Actions' setting.
+    if ( empty( $options['purge_on_save'] ) ) {
+        return;
+    }
+
+    $comment = get_comment( $comment_id );
+    if ( ! $comment ) {
+        return;
+    }
+
+    $post = get_post( $comment->comment_post_ID );
+    $purgeable_post_types = apply_filters('mfpc_purgeable_post_types', ['post', 'page']);
+    // Only purge for comments on published posts of purgeable types.
+    if ( ! $post || 'publish' !== $post->post_status || ! in_array( $post->post_type, $purgeable_post_types ) ) {
+        return;
+    }
+
+    if ( isset($options['purge_method']) && $options['purge_method'] === 'all' ) {
+        mfpc_purge_all_cache();
+    } else {
+        $keys_to_purge = mfpc_get_purge_keys_for_post( $post, $options['debug'] );
+        mfpc_perform_purge( $keys_to_purge, $options, $context );
+    }
+
+    // Pre-load if enabled
+    if ( ! empty( $options['preload_on_save'] ) ) {
+        mfpc_preload_urls( [ get_permalink( $post->ID ), home_url( '/' ) ] );
+    }
+}
+\add_action( 'comment_post', __NAMESPACE__ . '\mfpc_purge_on_comment', 10, 2 );
+\add_action( 'edit_comment', __NAMESPACE__ . '\mfpc_purge_on_comment', 10, 1 );
+\add_action( 'transition_comment_status', __NAMESPACE__ . '\mfpc_purge_on_comment', 10, 3 );
+\add_action( 'wp_set_comment_status', __NAMESPACE__ . '\mfpc_purge_on_comment', 10, 2 );
+\add_action( 'delete_comment', __NAMESPACE__ . '\mfpc_purge_on_comment', 10, 1 );
 
 /**
  * Get URLs of recent posts and pages.
