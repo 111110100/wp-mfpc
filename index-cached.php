@@ -47,6 +47,7 @@ $servers = isset( $config['servers'] ) && is_array( $config['servers'] ) && !emp
            ? $config['servers']
            : [['host' => '127.0.0.1', 'port' => '11211']]; // Default server
 $rules = isset( $config['rules'] ) && is_array( $config['rules'] ) ? $config['rules'] : [];
+$content_type_rules = isset( $config['content_type_rules'] ) && is_array( $config['content_type_rules'] ) ? $config['content_type_rules'] : [];
 $default_cache_time = isset( $config['default_cache_time'] ) ? (int) $config['default_cache_time'] : 0; // Default 0 (no cache) if not set
 $lazy_load_enabled = isset( $config['lazy_load'] ) ? (bool) $config['lazy_load'] : false;
 
@@ -117,15 +118,16 @@ if (!empty($rules)) {
     }
 }
 
-// Special handling for feeds (overrides rules if necessary, or apply if no rule matched)
-// You might want to add specific rules for feeds in the admin instead.
-if ( strstr( $request_uri, '/feed/' ) !== false ) {
-    $contentType = "Content-Type: application/rss+xml";
-    // Optionally set a specific cache time for feeds if not covered by rules
-    // if (!$matched_rule) $cacheTime = 1800; // e.g., 30 minutes for feeds if no rule matched
-} elseif ( strstr( $request_uri, '/atom/' ) !== false ) {
-    $contentType = "Content-Type: application/atom+xml";
-    // if (!$matched_rule) $cacheTime = 1800;
+// Apply configured Content-Type rules (overrides defaults and hardcoded feeds if matched)
+if (!empty($content_type_rules)) {
+    foreach ($content_type_rules as $rule) {
+        if ( isset($rule['path'], $rule['content_type']) && is_string($rule['path']) && $rule['path'] !== '' ) {
+             if ( strstr( $request_uri, $rule['path'] ) !== false ) {
+                 $contentType = "Content-Type: " . $rule['content_type'];
+                 break; // First match wins
+             }
+        }
+    }
 }
 
 // Set Content-Type header
