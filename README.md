@@ -109,14 +109,10 @@ You need to modify your Nginx server block configuration for your WordPress site
         }
         ```
 
-        Add this to `/etc/nginx/conf.d/memcached_upstream.conf`:
+        Copy the generated `memcached_upstream.conf` file into `/etc/nginx/conf.d`:
 
-        ```nginx
-        # Place this within your http { ... } block, or include the generated memcached_nginx.conf
-        upstream memcached_servers {
-            server 127.0.0.1:11211;
-            # server /var/run/memcached/memcached.sock; # Example for Unix socket
-        }
+        ```bash
+        cp /var/www/path/to/wordpress/wp-content/memcached_nginx.conf /etc/nginx/conf.d/
         ```
 
         You need to update `/etc/nginx/sites-enabled/default` (or if you're using virtual hosting, the relevant config site file) to include the generated `memblaze_nginx.conf` file:
