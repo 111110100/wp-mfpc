@@ -119,7 +119,7 @@ You need to modify your Nginx server block configuration for your WordPress site
         }
         ```
 
-        You need to change `/etc/nginx/sites-enabled/default` to prioritize `index-cached.php` for non-static file requests:
+        You need to update `/etc/nginx/sites-enabled/default` (or if you're using virtual hosting, the relevant config site file) to include the generated `memblaze_nginx.conf` file:
 
         ```nginx
         server {
@@ -127,103 +127,14 @@ You need to modify your Nginx server block configuration for your WordPress site
             server_name example.com;
             root /var/www/html; # Your WordPress root
 
-            # set $cache_flags empty
-            set $cache_flags "";
-
-            # Is the user  in?
-            if ($http_cookie ~* "(comment_author_|wordpress_logged_in_|wp-postpass_)") {
-                set $cache_flags "${cache_flags}C";
-            }
-
-            # Do we have query arguments?
-            if ($args) {
-                set $cache_flags "${cache_flags}Q";
-            }
-
-            # Use index.php by default
-            set $index_file /index.php;
-
-            # Chekc $cache_flags if not empty
-            if ($cache_flags = "") {
-                set $index_file /index-cached.php;
-            }
-
-            location / {
-                if ($request_method = POST) {
-                    return 405;
-                }
-
-                if ($request_method = GET) {
-                    return 405;
-                }
-
-                if ($http_cookie ~* "(comment_author_|wordpress_logged_in_|wp-postpass_)") {
-                    return 405;
-                }
-
-                default_type text/html;
-                add_header X-Cache-Status HIT;
-
-                set $memcached_key fullpage:$http_post$request_uri;
-                memcached_pass memcached_servers;
-
-                sub_filter '</html>' '</html>\n<!--Page retrieved (cache hit) from nginx/memcached-->';
-                sub_filter_once on;
-
-                error_page 404 405 502 504 = @nocache;
-            }
-
-            location @nocache {
-                add_header X-Cache-Status MISS;
-                index index.php;
-                try_files $uri $uri/ $index_file?$args;
-            }
-
-            # wp-admin should always use index.php
-            location /wp-admin/ {
-                index index.php;
-                try_files $uri $uri/ /index.php?$args;
-            }
-
-            # Rule for favicon.ico and robots.txt (optional, but good practice)
-            location = /favicon.ico { log_not_found off; access_log off; }
-            location = /robots.txt  { log_not_found off; access_log off; allow all; }
-
-            # Deny access to sensitive files
-            location ~* \.(engine|inc|info|install|make|module|profile|test|po|sh|sql|theme|tpl(\.php)?|xtmpl)$|~$ {
-                deny all;
-            }
-            location ~ /\. {
-                deny all;
-            }
-            location ~ wp-config.php { # Deny access to wp-config.php
-                deny all;
-            }
-
-            # Handle PHP requests via index-cached.php or index.php
-            # This setup ensures that if index-cached.php is directly requested, it's processed.
-            # And if a permalink resolves to a PHP file (which it shouldn't with pretty permalinks),
-            # it still goes through the caching layer.
             location ~ \.php$ {
-                try_files $uri /index-cached.php?$args; # Try direct PHP file, then fall back to index-cached.php
-
-                fastcgi_split_path_info ^(.+\.php)(/.+)$;
-                fastcgi_pass unix:/var/run/php/phpX.Y-fpm.sock; # Adjust to your PHP-FPM socket/address
-                fastcgi_index index-cached.php; # Important: Nginx will look for index-cached.php
-                include fastcgi_params;
-                fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-                # If SCRIPT_FILENAME is $document_root/index-cached.php, that's what PHP executes.
-                # If $fastcgi_script_name is something else like /some/other.php,
-                # index-cached.php needs to be smart enough to load that, or this rule needs adjustment.
-                # However, with WordPress permalinks, $fastcgi_script_name will typically be /index-cached.php.
+                include snippets/fastcgi_params;
+                fastcgi_pass unix:/var/run/php/phpX.Y-fpm.sock; # Where X.Y is your PHP-FPM version
             }
 
-            # Add browser caching for static assets
-            location ~* \.(css|js|jpg|jpeg|gif|png|ico|woff|woff2|ttf|svg|otf)$ {
-                expires 1M;
-                access_log off;
-                add_header Cache-Control "public";
-            }
+            # MemBlaze
+            include /var/www/path/to/wordpress/wp-config/memcached_nginx.conf;
+
         }
         ```
         **Note**: The Nginx configuration can be complex and site-specific. The example above is a guideline. The crucial part is that requests that would normally go to `index.php` should now go to `index-cached.php`. The `memcached_nginx.conf` generated by the plugin provides a more specific `location / { ... }` block that you might adapt.
@@ -254,7 +165,12 @@ You need to modify your Nginx server block configuration for your WordPress site
     *   **Path**: The URI path prefix (e.g., `/blog/`, `/products/category/`).
     *   **Time in Seconds**: Cache duration for matching paths. `0` means do not cache.
     *   Rules are matched in the order they appear. The first matching rule applies.
-5.  **Save Settings**: Click "Save Settings". This will:
+5.  **Content Type Rules**:
+    *   Define specific Content-Types for URI paths. Useful for API endpoints or feeds. These rules override the default text/html.
+    *   **URI Path Contains**: URI to match
+    *   **Content Type**: The assigned content type for this URI path.
+    *   **Actions**: Option to delete an entry
+6.  **Save Settings**: Click "Save Settings". This will:
     *   Save your settings to the WordPress database.
     *   Generate/update `wp-content/memcached-fp-config.php` (read by `index-cached.php`).
     *   Generate/update `wp-content/memcached_nginx.conf` (for your reference).
