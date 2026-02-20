@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       MemBlaze Full Page Cache
  * Description:       Provides an admin interface to configure Memcached servers and cache rules for index-cached.php. Also allows purging cache on post save and generates Nginx upstream config.
- * Version:           1.5.1
+ * Version:           1.5.2
  * Author:            Erwin Lomibao/Gemini Code Assist
  * Author URI:        https://erwinlomibao.com/memblaze
  * License:           GPL-2.0-or-later
