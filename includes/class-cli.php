@@ -107,14 +107,58 @@ class CLI extends WP_CLI_Command {
             WP_CLI::error( 'No Memcached servers configured.' );
         }
 
-        foreach ( $servers as $server ) {
-            $status = mfpc_check_server_status( $server );
-            if ( $status['class'] === 'status-ok' ) {
-                WP_CLI::log( "Server {$server['host']}:{$server['port']} - OK" );
+        $memcached = mfpc_get_memcached_connection( $servers );
+
+        if ( ! $memcached ) {
+            WP_CLI::error( 'Could not connect to Memcached. Check configuration and ensure the PECL extension is loaded.' );
+            return;
+        }
+
+        $all_stats = $memcached->getStats();
+        $memcached->quit();
+
+        if ( $all_stats === false ) {
+            WP_CLI::error( 'Failed to retrieve stats from Memcached. All configured servers may be down.' );
+            return;
+        }
+
+        $items = [];
+        foreach ( $servers as $server_config ) {
+            $host        = $server_config['host'];
+            $port        = $server_config['port'];
+            // The key returned by getStats() for a socket is 'path:0'.
+            $server_key  = ( strpos( $host, '/' ) === 0 ) ? $host . ':0' : "{$host}:{$port}";
+            $display_key = ( strpos( $host, '/' ) === 0 ) ? $host : "{$host}:{$port}";
+
+            if ( isset( $all_stats[ $server_key ] ) && is_array( $all_stats[ $server_key ] ) ) {
+                $server_stats = $all_stats[ $server_key ];
+                $items[]      = [
+                    'Server'      => $display_key,
+                    'Status'      => 'Connected',
+                    'Uptime'      => mfpc_seconds_to_human_time( $server_stats['uptime'] ?? 0 ),
+                    'Items'       => number_format_i18n( $server_stats['curr_items'] ?? 0 ),
+                    'Bytes Used'  => size_format( $server_stats['bytes'] ?? 0 ),
+                    'Connections' => number_format_i18n( $server_stats['curr_connections'] ?? 0 ),
+                ];
             } else {
-                WP_CLI::warning( "Server {$server['host']}:{$server['port']} - " . $status['message'] );
+                // Server is configured but not in stats, so it's down.
+                $items[] = [
+                    'Server'      => $display_key,
+                    'Status'      => 'Failed to connect',
+                    'Uptime'      => 'N/A',
+                    'Items'       => 'N/A',
+                    'Bytes Used'  => 'N/A',
+                    'Connections' => 'N/A',
+                ];
             }
         }
+
+        if ( empty( $items ) ) {
+            WP_CLI::warning( 'No server stats to display. This could happen if no servers are configured or none are reachable.' );
+            return;
+        }
+
+        WP_CLI\Utils\format_items( 'table', $items, [ 'Server', 'Status', 'Uptime', 'Items', 'Bytes Used', 'Connections' ] );
     }
 
     /**
