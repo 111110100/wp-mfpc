@@ -2,7 +2,7 @@
 /**
  * @package index-cached.php
  * @author erwin lomibao/Gemini Code Assist
- * @version 1.5.2
+ * @version 1.5.3
  * @license GPLv2
  * @website https://github.com/111110100/wp-mfpc
  */
@@ -241,7 +241,7 @@ if ($cache_bypassed_by_cookie) {
             $cache_age = ($generated_at > 0) ? (time() - $generated_at) : 0;
 
             // Probabilistic early expiration check. A beta of 0 disables this feature.
-            if ($probabilistic_beta > 0) {
+            if ($probabilistic_beta > 0 && $generated_at > 0) {
                 $random_float = mt_rand() / mt_getrandmax();
                 // The formula is: (time() - generated_at) > TTL - beta * -log(rand)
                 // We check the inverse: if it's NOT time to regenerate, it's a hit.
@@ -349,7 +349,10 @@ if ( $html === false ) { // This condition now covers cache miss, disabled, or b
     // Only try to set cache if NOT bypassed, connection was successful, content exists, and cache time > 0
     if ( !$cache_bypassed_by_cookie && $memcached && $html !== false && $html !== '' && $cacheTime > 0 ) {
         $generated_at = time();
-        $payload = $html . "\n<!-- MFPC_META: " . $generated_at . " -->";
+        $payload = $html;
+        if ( strpos( $contentType, 'text/html' ) !== false ) {
+            $payload .= "\n<!-- MFPC_META: " . $generated_at . " -->";
+        }
         $set_success = $memcached->set( $cacheKey, $payload, $cacheTime );
         if (!$set_success && $debug) {
              error_log("Memcached: Failed to set key '{$cacheKey}'. Result code: " . $memcached->getResultCode() . " (" . $memcached->getResultMessage() . ")");
@@ -372,7 +375,7 @@ $cacheExpiry = 'Cache TTL: %d seconds';
 echo $html;
 
 // Add debug comment if enabled
-if ( $debug ) {
+if ( $debug && strpos( $contentType, 'text/html' ) !== false ) {
     $debug_output = "\n<!-- " . sprintf( $debugMessage, $duration );
     if ($cache_bypassed_by_cookie) {
         $debug_output .= ' | Cache Bypassed by Cookie';
