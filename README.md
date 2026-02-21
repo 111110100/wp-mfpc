@@ -199,6 +199,7 @@ The plugin supports WP-CLI commands:
 *   `wp mfpc flush <all|post|page> [<id>]`: Flush all Memcached servers or specific items.
 *   `wp mfpc status`: Check connection status of servers.
 *   `wp mfpc warmup [<count>]`: Pre-cache recent posts/pages.
+*   `wp mfpc warmup <all|post|page> [<id>]`: Pre-cache all or specific post/page.
 *   `wp mfpc generate-nginx`: Regenerate Nginx config file.
 
 ### Step 6: Emergency Bypass
