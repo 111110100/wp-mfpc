@@ -111,8 +111,7 @@ if (!empty($rules)) {
             if ( strstr( $request_uri, $rule['path'] ) !== false ) {
                 $cacheTime = (int) $rule['time'];
                 $matched_rule = true;
-                // If rules should be processed in order and first match wins:
-                // break;
+                break; // First match wins
             }
         }
     }
