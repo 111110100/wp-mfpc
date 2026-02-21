@@ -190,31 +190,71 @@ class CLI extends WP_CLI_Command {
     }
 
     /**
-     * Pre-caches (warms) the most recent posts and pages.
+     * Pre-caches (warms) posts and pages.
      *
      * ## OPTIONS
      *
-     * [<count>]
-     * : Number of recent posts/pages to warm. Defaults to plugin setting.
+     * <type>
+     * : The type of warmup to perform (all, post, page, or number of recent posts).
+     *
+     * [<id>]
+     * : The ID of the post or page to warm. Required if type is post or page.
      *
      * ## EXAMPLES
      *
-     *     wp mfpc warmup
+     *     wp mfpc warmup all
+     *     wp mfpc warmup post 123
      *     wp mfpc warmup 50
      *
      * @when after_wp_load
      */
     public function warmup( $args, $assoc_args ) {
         $options = mfpc_get_options();
-        $count = isset($args[0]) ? (int)$args[0] : (isset($options['pre_cache_recent_count']) ? (int)$options['pre_cache_recent_count'] : 0);
 
-        if ( $count <= 0 ) {
-            WP_CLI::error( "Please specify a count or configure the 'Pre-cache Recent Posts' setting." );
+        if ( empty( $args ) ) {
+            $count = isset( $options['pre_cache_recent_count'] ) ? (int) $options['pre_cache_recent_count'] : 0;
+            if ( $count > 0 ) {
+                $args = [ $count ];
+            } else {
+                WP_CLI::error( 'Usage: wp mfpc warmup <all|post|page|count> [<id>]' );
+            }
         }
 
-        WP_CLI::log( "Fetching {$count} recent items..." );
+        list( $type, $id ) = $args + [ null, null ];
+        $urls = [];
 
-        $urls = mfpc_get_recent_urls( $count );
+        if ( 'all' === $type ) {
+            WP_CLI::log( 'Fetching all published posts and pages...' );
+            $query = new \WP_Query( [
+                'post_type'      => [ 'post', 'page' ],
+                'post_status'    => 'publish',
+                'posts_per_page' => -1,
+                'fields'         => 'ids',
+            ] );
+            foreach ( $query->posts as $p_id ) {
+                $urls[] = get_permalink( $p_id );
+            }
+            $urls[] = home_url( '/' );
+            $urls   = array_unique( $urls );
+        } elseif ( in_array( $type, [ 'post', 'page' ], true ) ) {
+            if ( empty( $id ) || ! is_numeric( $id ) ) {
+                WP_CLI::error( "Invalid ID. Usage: wp mfpc warmup $type <id>" );
+            }
+            $post = get_post( $id );
+            if ( ! $post ) {
+                WP_CLI::error( "Post/Page with ID $id not found." );
+            }
+            $urls[] = get_permalink( $id );
+        } elseif ( is_numeric( $type ) ) {
+            $count = (int) $type;
+            if ( $count <= 0 ) {
+                WP_CLI::error( 'Count must be greater than 0.' );
+            }
+            WP_CLI::log( "Fetching {$count} recent items..." );
+            $urls = mfpc_get_recent_urls( $count );
+        } else {
+            WP_CLI::error( 'Invalid type. Usage: wp mfpc warmup <all|post|page|count> [<id>]' );
+        }
 
         if ( empty( $urls ) ) {
              WP_CLI::warning( "No URLs found to warm." );
@@ -282,11 +322,12 @@ class CLI extends WP_CLI_Command {
      */
     public function help() {
         WP_CLI::log( "Available commands:" );
-        WP_CLI::log( "  wp mfpc flush <all|post|page> [<id>] Flush all cache or specific post/page." );
-        WP_CLI::log( "  wp mfpc status                   Check status of Memcached servers." );
-        WP_CLI::log( "  wp mfpc warmup [<count>]         Pre-cache recent posts/pages." );
-        WP_CLI::log( "  wp mfpc generate-nginx           Generate Nginx configuration file." );
-        WP_CLI::log( "  wp mfpc help                     Display this help message." );
+        WP_CLI::log( "  wp mfpc flush <all|post|page> [<id>]  Flush all cache or specific post/page." );
+        WP_CLI::log( "  wp mfpc status                        Check status of Memcached servers." );
+        WP_CLI::log( "  wp mfpc warmup [<count>]              Pre-cache recent posts/pages." );
+        WP_CLI::log( "  wp mfpc warmup <all|post|page> [<id>] Pre-cache all or specific post/page." );
+        WP_CLI::log( "  wp mfpc generate-nginx                Generate Nginx configuration file." );
+        WP_CLI::log( "  wp mfpc help                          Display this help message." );
     }
 }
 
