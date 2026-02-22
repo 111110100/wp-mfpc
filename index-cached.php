@@ -2,7 +2,7 @@
 /**
  * @package index-cached.php
  * @author erwin lomibao/Gemini Code Assist
- * @version 1.5.3
+ * @version 1.5.4
  * @license GPLv2
  * @website https://github.com/111110100/wp-mfpc
  */
