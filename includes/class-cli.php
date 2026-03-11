@@ -19,16 +19,17 @@ class CLI extends WP_CLI_Command {
 	 * ## OPTIONS
 	 *
 	 * <type>
-	 * : The type of flush to perform (all, post, or page).
+	 * : The type of flush to perform (all, posts, or pages).
 	 *
-	 * [<id>]
-	 * : The ID of the post or page to flush. Required if type is post or page.
+	 * [<ids>]
+	 * : Comma-separated IDs of the posts or pages to flush. Required if type is posts or pages.
 	 *
 	 * ## EXAMPLES
 	 *
 	 *     wp mfpc flush all
-	 *     wp mfpc flush post 123
-	 *     wp mfpc flush page 456
+	 *     wp mfpc flush posts 123
+	 *     wp mfpc flush posts 123,456,789
+	 *     wp mfpc flush pages 456
 	 *
 	 * @when after_wp_load
 	 */
@@ -36,10 +37,10 @@ class CLI extends WP_CLI_Command {
 		$options = mfpc_get_options();
 
 		if ( empty( $args ) ) {
-			WP_CLI::error( 'Usage: wp mfpc flush <all|post|page> [<id>]' );
+			WP_CLI::error( 'Usage: wp mfpc flush <all|posts|pages> [<ids>]' );
 		}
 
-		list( $type, $id ) = $args + [ null, null ];
+		list( $type, $ids_str ) = $args + [ null, null ];
 
 		if ( 'all' === $type ) {
 			$servers = $options['servers'];
@@ -60,23 +61,36 @@ class CLI extends WP_CLI_Command {
 				WP_CLI::error( 'Failed to flush Memcached.' );
 			}
 			$memcached->quit();
-		} elseif ( in_array( $type, [ 'post', 'page' ] ) ) {
-			if ( empty( $id ) || ! is_numeric( $id ) ) {
-				WP_CLI::error( "Invalid ID. Usage: wp mfpc flush $type <id>" );
+		} elseif ( in_array( $type, [ 'posts', 'pages', 'post', 'page' ] ) ) {
+			if ( empty( $ids_str ) ) {
+				WP_CLI::error( "Invalid IDs. Usage: wp mfpc flush $type <ids>" );
 			}
 
-			$post = get_post( $id );
-			if ( ! $post ) {
-				WP_CLI::error( "Post/Page with ID $id not found." );
-			}
+            $ids = explode( ',', $ids_str );
+            $purged_count = 0;
 
-			$keys = mfpc_get_purge_keys_for_post( $post, false );
-			if ( empty( $keys ) ) {
-				WP_CLI::warning( "No cache keys generated for $type $id." );
-				return;
-			}
+            foreach ( $ids as $id ) {
+                $id = trim( $id );
+                if ( ! is_numeric( $id ) ) {
+                    WP_CLI::warning( "Invalid ID: $id. Skipping." );
+                    continue;
+                }
 
-			mfpc_perform_purge( $keys, $options, 'cli_purge' );
+                $post = get_post( $id );
+                if ( ! $post ) {
+                    WP_CLI::warning( "Post/Page with ID $id not found. Skipping." );
+                    continue;
+                }
+
+                $keys = mfpc_get_purge_keys_for_post( $post, false );
+                if ( empty( $keys ) ) {
+                    WP_CLI::warning( "No cache keys generated for ID $id. Skipping." );
+                    continue;
+                }
+
+                mfpc_perform_purge( $keys, $options, 'cli_purge' );
+                $purged_count++;
+            }
 
 			if ( get_transient( 'mfpc_purge_error' ) ) {
 				$error = get_transient( 'mfpc_purge_error' );
@@ -84,9 +98,9 @@ class CLI extends WP_CLI_Command {
 				WP_CLI::error( $error );
 			}
 
-			WP_CLI::success( "Cache purged for $type $id." );
+			WP_CLI::success( "Cache purged for $purged_count items." );
 		} else {
-			WP_CLI::error( 'Invalid type. Usage: wp mfpc flush <all|post|page> [<id>]' );
+			WP_CLI::error( 'Invalid type. Usage: wp mfpc flush <all|posts|pages> [<ids>]' );
 		}
 	}
 
@@ -195,15 +209,15 @@ class CLI extends WP_CLI_Command {
      * ## OPTIONS
      *
      * <type>
-     * : The type of warmup to perform (all, post, page, or number of recent posts).
+     * : The type of warmup to perform (all, posts, pages, or number of recent items).
      *
-     * [<id>]
-     * : The ID of the post or page to warm. Required if type is post or page.
+     * [<ids>]
+     * : Comma-separated IDs of the posts or pages to warm. Required if type is posts or pages.
      *
      * ## EXAMPLES
      *
      *     wp mfpc warmup all
-     *     wp mfpc warmup post 123
+     *     wp mfpc warmup posts 123,456
      *     wp mfpc warmup 50
      *
      * @when after_wp_load
@@ -216,11 +230,11 @@ class CLI extends WP_CLI_Command {
             if ( $count > 0 ) {
                 $args = [ $count ];
             } else {
-                WP_CLI::error( 'Usage: wp mfpc warmup <all|post|page|count> [<id>]' );
+                WP_CLI::error( 'Usage: wp mfpc warmup <all|posts|pages|count> [<ids>]' );
             }
         }
 
-        list( $type, $id ) = $args + [ null, null ];
+        list( $type, $ids_str ) = $args + [ null, null ];
         $urls = [];
 
         if ( 'all' === $type ) {
@@ -236,15 +250,24 @@ class CLI extends WP_CLI_Command {
             }
             $urls[] = home_url( '/' );
             $urls   = array_unique( $urls );
-        } elseif ( in_array( $type, [ 'post', 'page' ], true ) ) {
-            if ( empty( $id ) || ! is_numeric( $id ) ) {
-                WP_CLI::error( "Invalid ID. Usage: wp mfpc warmup $type <id>" );
+        } elseif ( in_array( $type, [ 'posts', 'pages', 'post', 'page' ], true ) ) {
+            if ( empty( $ids_str ) ) {
+                WP_CLI::error( "Invalid IDs. Usage: wp mfpc warmup $type <ids>" );
             }
-            $post = get_post( $id );
-            if ( ! $post ) {
-                WP_CLI::error( "Post/Page with ID $id not found." );
+            $ids = explode( ',', $ids_str );
+            foreach ( $ids as $id ) {
+                $id = trim( $id );
+                if ( ! is_numeric( $id ) ) {
+                    WP_CLI::warning( "Invalid ID: $id. Skipping." );
+                    continue;
+                }
+                $post = get_post( $id );
+                if ( ! $post ) {
+                    WP_CLI::warning( "Post/Page with ID $id not found. Skipping." );
+                    continue;
+                }
+                $urls[] = get_permalink( $id );
             }
-            $urls[] = get_permalink( $id );
         } elseif ( is_numeric( $type ) ) {
             $count = (int) $type;
             if ( $count <= 0 ) {
@@ -253,7 +276,7 @@ class CLI extends WP_CLI_Command {
             WP_CLI::log( "Fetching {$count} recent items..." );
             $urls = mfpc_get_recent_urls( $count );
         } else {
-            WP_CLI::error( 'Invalid type. Usage: wp mfpc warmup <all|post|page|count> [<id>]' );
+            WP_CLI::error( 'Invalid type. Usage: wp mfpc warmup <all|posts|pages|count> [<ids>]' );
         }
 
         if ( empty( $urls ) ) {
@@ -261,6 +284,7 @@ class CLI extends WP_CLI_Command {
              return;
         }
 
+        $urls = array_unique( $urls );
         WP_CLI::log( "Warming up " . count($urls) . " URLs..." );
 
         $memcached = mfpc_get_memcached_connection( $options['servers'] );
@@ -322,12 +346,12 @@ class CLI extends WP_CLI_Command {
      */
     public function help() {
         WP_CLI::log( "Available commands:" );
-        WP_CLI::log( "  wp mfpc flush <all|post|page> [<id>]  Flush all cache or specific post/page." );
-        WP_CLI::log( "  wp mfpc status                        Check status of Memcached servers." );
-        WP_CLI::log( "  wp mfpc warmup [<count>]              Pre-cache recent posts/pages." );
-        WP_CLI::log( "  wp mfpc warmup <all|post|page> [<id>] Pre-cache all or specific post/page." );
-        WP_CLI::log( "  wp mfpc generate-nginx                Generate Nginx configuration file." );
-        WP_CLI::log( "  wp mfpc help                          Display this help message." );
+        WP_CLI::log( "  wp mfpc flush <all|posts|pages> [<ids>]  Flush all cache or specific posts/pages." );
+        WP_CLI::log( "  wp mfpc status                         Check status of Memcached servers." );
+        WP_CLI::log( "  wp mfpc warmup [<count>]               Pre-cache recent items." );
+        WP_CLI::log( "  wp mfpc warmup <all|posts|pages> [<ids>] Pre-cache all or specific posts/pages." );
+        WP_CLI::log( "  wp mfpc generate-nginx                 Generate Nginx configuration file." );
+        WP_CLI::log( "  wp mfpc help                           Display this help message." );
     }
 }
 

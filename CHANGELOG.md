@@ -2,14 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.6.0] TODO //change this to a date when a version is released
-### New features //change this to "Added" once new features are added
+## [1.6.0] TODO
+### New features
 - **Minify assets**: Minify CSS, JS, and HTML (including 3rd party)
 
-## [1.5.5] TODO //change this to a date when a new version is released
-### New features //change this to "Added" once new features are added
-- **Warm up**: Update new cli option: warmup <posts|pages> n1,n2... nX which allows multiple posts/pages to be pre-cached. Replace existing cli option in 1.5.4
-- **Mutiple flushes**: Add new cli option: flush <posts|pages> n1,n2... nX which allows multiple posts/pages to be flushed.
+## [1.5.5] - 2026-03-11
+### Added
+- **Warm up**: Updated CLI command `warmup <posts|pages> <ids>` to allow multiple comma-separated IDs.
+- **Multiple flushes**: Added CLI command `flush <posts|pages> <ids>` to allow multiple comma-separated IDs.
 
 ## [1.5.4] - New warmup cache command
 ### Added

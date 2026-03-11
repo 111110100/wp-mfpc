@@ -154,10 +154,10 @@ define( 'WP_MFPC_BYPASS_COOKIES', [
 
 The plugin supports WP-CLI commands:
 
-*   `wp mfpc flush <all|post|page> [<id>]`: Flush all Memcached servers or specific items.
+*   `wp mfpc flush <all|posts|pages> [<ids>]`: Flush cache items (comma-separated IDs for posts/pages).
 *   `wp mfpc status`: Check connection status of servers.
 *   `wp mfpc warmup [<count>]`: Pre-cache recent posts/pages.
-*   `wp mfpc warmup <all|post|page> [<id>]`: Pre-cache all or specific post/page.
+*   `wp mfpc warmup <all|posts|pages> [<ids>]`: Pre-cache specific items (comma-separated IDs for posts/pages).
 *   `wp mfpc generate-nginx`: Regenerate configuration files.
 *   `wp mfpc help`: Display available commands.
 

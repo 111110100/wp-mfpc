@@ -146,10 +146,10 @@ define( 'WP_MFPC_BYPASS_COOKIES', [
 
 ### Step 5: WP-CLI Usage
 
-*   `wp mfpc flush <all|post|page> [<id>]`: Flush cache items.
+*   `wp mfpc flush <all|posts|pages> [<ids>]`: Flush cache items (comma-separated IDs for posts/pages).
 *   `wp mfpc status`: Check server connectivity.
 *   `wp mfpc warmup [<count>]`: Pre-cache recent items.
-*   `wp mfpc warmup <all|post|page> [<id>]`: Pre-cache specific items.
+*   `wp mfpc warmup <all|posts|pages> [<ids>]`: Pre-cache specific items (comma-separated IDs for posts/pages).
 *   `wp mfpc generate-nginx`: Regenerate configuration files.
 *   `wp mfpc help`: Display available commands.
 
