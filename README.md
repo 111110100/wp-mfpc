@@ -23,7 +23,7 @@ This system provides a robust full-page caching mechanism for WordPress sites us
 *   **Lazy Load (Experimental)**: Automatically adds `loading="lazy"` attributes to images and iframes to improve Core Web Vitals.
 *   **Cookie-Based Cache Bypass**: Define a list of cookie name prefixes. If a visitor has any of these cookies, the cache will be bypassed for them, ensuring dynamic content for logged-in users or users with specific session cookies (e.g., e-commerce carts).
 *   **Admin Interface & Stats**:
-    *   **Dashboard Stats**: View server statistics.
+    *   **Dashboard Stats**: View cache hit/miss ratios and server statistics.
     *   **Admin Bar**: See cache status of the current page and purge it instantly.
 *   **Debug Mode**: Optional debug comments in the HTML output showing cache status and generation time.
 *   **Nginx Configuration Generation**: The plugin generates a sample Nginx configuration snippet to help direct requests to `index-cached.php`.
@@ -60,62 +60,30 @@ This system provides a robust full-page caching mechanism for WordPress sites us
 
 ### Step 1: Install Files
 
-1.  **Plugin (`memblaze-full-page-cache-config.php`)**:
-    *   Place the `memblaze-full-page-cache-config.php` file (and any associated files if it's part of a larger plugin structure, e.g., in a directory like `wp-content/plugins/memblaze-fullpage-cache-config/`) into your WordPress `wp-content/plugins/` directory.
-    *   Activate the "Memcached Full Page Cache Config" plugin from the WordPress admin area.
+1.  **Plugin (`memblaze-fullpage-cache-config.php`)**:
+    *   Place the entire `wp-mfpc` directory into your WordPress `wp-content/plugins/` directory (or create a directory named `memblaze-fullpage-cache-config` and place all plugin files there).
+    *   Activate the "Memcached Full Page Cache" plugin from the WordPress admin area.
 
 2.  **Front Controller (`index-cached.php`)**:
     *   Place the `index-cached.php` file into the root directory of your WordPress installation (the same directory where `wp-config.php` and the main `index.php` are located).
 
 ### Step 2: Configure Nginx
 
-You need to modify your Nginx server block configuration for your WordPress site to direct appropriate requests to `index-cached.php`.
+You need to modify your Nginx configuration to direct appropriate requests to `index-cached.php`.
 
-1.  **Generate Nginx Config Snippet**:
-    *   Go to "Settings" -> "Memcached Cache Config" in your WordPress admin.
+1.  **Generate Nginx Config**:
+    *   Go to "MemBlaze Cache" in your WordPress admin menu.
     *   Configure your Memcached server(s) under the "Memcached Servers" section.
     *   Save the settings.
-    *   The plugin will generate a file named `memcached_nginx.conf` in your `wp-content/` directory. This file contains a suggested Nginx `upstream` block and location rules.
+    *   The plugin will generate two files in your `wp-content/` directory:
+        *   `memcached_upstream.conf`: Contains the `upstream memcached_servers { ... }` block.
+        *   `memcached_nginx.conf`: Contains the location rules and logic for serving from Memcached.
 
 2.  **Apply Nginx Configuration**:
-    *   **Copy the `upstream` block** from `wp-content/memcached_nginx.conf` (e.g., `upstream memcached_servers { ... }`) and place it in your main `nginx.conf` file within the `http { ... }` block, or in a dedicated conf file included by `nginx.conf`.
+    *   **Include the Upstream Config**:
+        Copy `wp-content/memcached_upstream.conf` to `/etc/nginx/conf.d/` or include it in your main `nginx.conf` within the `http { ... }` block.
     *   **Modify your site's server block**:
-        The key is to change your `try_files` directive and the PHP processing block.
-        A typical WordPress Nginx configuration might look like this:
-
-        ```nginx
-        server {
-            listen 80;
-            server_name example.com;
-            root /var/www/html;
-
-            index index.php index.html index.htm;
-
-            location / {
-                try_files $uri $uri/ /index.php?$args;
-            }
-
-            location ~ \.php$ {
-                try_files $uri =404;
-                fastcgi_split_path_info ^(.+\.php)(/.+)$;
-                fastcgi_pass unix:/var/run/php/phpX.Y-fpm.sock; # Adjust to your PHP-FPM socket/address
-                fastcgi_index index.php;
-                include fastcgi_params;
-                fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-                # ... other params
-            }
-
-            # ... other rules (static assets, security)
-        }
-        ```
-
-        Copy the generated `memcached_upstream.conf` file into `/etc/nginx/conf.d`:
-
-        ```bash
-        cp /var/www/path/to/wordpress/wp-content/memcached_nginx.conf /etc/nginx/conf.d/
-        ```
-
-        You need to update `/etc/nginx/sites-enabled/default` (or if you're using virtual hosting, the relevant config site file) to include the generated `memblaze_nginx.conf` file:
+        Include the generated `memcached_nginx.conf` in your `server` block:
 
         ```nginx
         server {
@@ -123,27 +91,22 @@ You need to modify your Nginx server block configuration for your WordPress site
             server_name example.com;
             root /var/www/html; # Your WordPress root
 
-            location ~ \.php$ {
-                include snippets/fastcgi_params;
-                fastcgi_pass unix:/var/run/php/phpX.Y-fpm.sock; # Where X.Y is your PHP-FPM version
-            }
+            # Include the MemBlaze location rules
+            include /var/www/path/to/wordpress/wp-content/memcached_nginx.conf;
 
-            # MemBlaze
-            include /var/www/path/to/wordpress/wp-config/memcached_nginx.conf;
-
+            # ... other rules (static assets, security)
         }
         ```
-        **Note**: The Nginx configuration can be complex and site-specific. The example above is a guideline. The crucial part is that requests that would normally go to `index.php` should now go to `index-cached.php`. The `memcached_nginx.conf` generated by the plugin provides a more specific `location / { ... }` block that you might adapt.
 
 3.  **Test Nginx Configuration**:
     `sudo nginx -t`
 
 4.  **Reload Nginx**:
-    `sudo systemctl reload nginx` or `sudo service nginx reload`
+    `sudo systemctl reload nginx`
 
 ### Step 3: Configure the Plugin
 
-1.  Navigate to "Settings" -> "Memcached Cache Config" in your WordPress admin dashboard.
+1.  Navigate to "MemBlaze Cache" -> "Config" in your WordPress admin dashboard.
 2.  **General Settings**:
     *   **Enable Debug**: Check this to add HTML comments at the end of your pages showing cache status (hit/miss, bypass reason) and generation time. Useful for testing.
     *   **Default Cache Time**: Set the default expiration time in seconds for cached pages (e.g., `3600` for 1 hour).
@@ -166,12 +129,7 @@ You need to modify your Nginx server block configuration for your WordPress site
     *   **URI Path Contains**: URI to match
     *   **Content Type**: The assigned content type for this URI path.
     *   **Actions**: Option to delete an entry
-6.  **Save Settings**: Click "Save Settings". This will:
-    *   Save your settings to the WordPress database.
-    *   Generate/update `wp-content/memcached-fp-config.php` (read by `index-cached.php`).
-    *   Generate/update `wp-content/memcached_nginx.conf` (for your reference).
-
-    *   Generate/update `wp-content/memcached_nginx.conf` (for your reference).
+6.  **Save Settings**: Click "Save Settings". This updates the configuration files in `wp-content/`.
 
 ### Step 4: Enterprise Configuration (Optional)
 
@@ -200,7 +158,8 @@ The plugin supports WP-CLI commands:
 *   `wp mfpc status`: Check connection status of servers.
 *   `wp mfpc warmup [<count>]`: Pre-cache recent posts/pages.
 *   `wp mfpc warmup <all|post|page> [<id>]`: Pre-cache all or specific post/page.
-*   `wp mfpc generate-nginx`: Regenerate Nginx config file.
+*   `wp mfpc generate-nginx`: Regenerate configuration files.
+*   `wp mfpc help`: Display available commands.
 
 ### Step 6: Emergency Bypass
 
