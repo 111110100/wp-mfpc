@@ -2,7 +2,7 @@
 /**
  * @package index-cached.php
  * @author erwin lomibao/Gemini Code Assist
- * @version 1.5.5
+ * @version 1.6.0
  * @license GPLv2
  * @website https://github.com/111110100/wp-mfpc
  */
@@ -50,6 +50,7 @@ $rules = isset( $config['rules'] ) && is_array( $config['rules'] ) ? $config['ru
 $content_type_rules = isset( $config['content_type_rules'] ) && is_array( $config['content_type_rules'] ) ? $config['content_type_rules'] : [];
 $default_cache_time = isset( $config['default_cache_time'] ) ? (int) $config['default_cache_time'] : 0; // Default 0 (no cache) if not set
 $lazy_load_enabled = isset( $config['lazy_load'] ) ? (bool) $config['lazy_load'] : false;
+$minify_assets_enabled = isset( $config['minify_assets'] ) ? (bool) $config['minify_assets'] : false;
 
 // --- Probabilistic Early Expiration ---
 // To prevent cache stampedes, one process can be chosen to regenerate a cache item
@@ -82,6 +83,46 @@ function mfpc_should_bypass_cache(array $bypass_prefixes, bool $debug_mode = fal
         }
     }
     return false;
+}
+
+/**
+ * Minifies HTML, inline CSS, and inline JS.
+ *
+ * @param string $buffer The content to minify.
+ * @return string The minified content.
+ */
+function mfpc_minify_output($buffer) {
+    if ( empty( $buffer ) ) {
+        return $buffer;
+    }
+
+    // Minify inline CSS
+    $buffer = preg_replace_callback('/<style\b[^>]*>(.*?)<\/style>/is', function($matches) {
+        $css = $matches[1];
+        $css = preg_replace('/\/\*.*?\*\//s', '', $css); // Remove comments
+        $css = preg_replace('/\s*([\{\}:;,])\s*/', '$1', $css); // Remove whitespaces around { } : ; ,
+        $css = str_replace(';}', '}', $css); // Remove last semicolon
+        return '<style>' . trim($css) . '</style>';
+    }, $buffer);
+
+    // Minify inline JS (Basic comment removal)
+    $buffer = preg_replace_callback('/<script\b[^>]*>(.*?)<\/script>/is', function($matches) {
+        $js = $matches[1];
+        $js = preg_replace('/\/\*.*?\*\//s', '', $js); // Remove block comments
+        return '<script>' . trim($js) . '</script>';
+    }, $buffer);
+
+    // Remove HTML comments (except IE conditional comments)
+    $buffer = preg_replace('/<!--(?!\s*(?:\[if [^\]]+]|<!|>))(?:(?!-->).)*-->/s', '', $buffer);
+
+    // Collapse multiple whitespaces into a single space
+    $buffer = preg_replace('/\s+/S', ' ', $buffer);
+
+    // Remove spaces between tags where it is safe to do so
+    // This part is conservative to avoid breaking text flow
+    $buffer = str_replace( "> <", "><", $buffer );
+
+    return trim($buffer);
 }
 
 // --- Cache Time & Content Type Determination ---
@@ -343,6 +384,11 @@ if ( $html === false ) { // This condition now covers cache miss, disabled, or b
             },
             $html
         );
+    }
+
+    // --- Asset Minification ---
+    if ( $minify_assets_enabled && $html !== false && strpos( $contentType, 'text/html' ) !== false ) {
+        $html = mfpc_minify_output( $html );
     }
 
     // --- Cache Storage ---
