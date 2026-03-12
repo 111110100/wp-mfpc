@@ -2,9 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.6.0] TODO
-### New features
-- **Minify assets**: Minify CSS, JS, and HTML (including 3rd party)
+## [1.6.0] - 2026-03-12
+### Added
+- **Minify assets**: Minify HTML, inline CSS, and inline JS to reduce page size and improve performance.
 
 ## [1.5.5] - 2026-03-11
 ### Added
