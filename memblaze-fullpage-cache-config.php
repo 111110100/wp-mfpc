@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       MemBlaze Full Page Cache
  * Description:       Provides an admin interface to configure Memcached servers and cache rules for index-cached.php. Also allows purging cache on post save and generates Nginx upstream config.
- * Version:           1.5.5
+ * Version:           1.6.0
  * Author:            Erwin Lomibao/Gemini Code Assist
  * Author URI:        https://erwinlomibao.com/memblaze
  * License:           GPL-2.0-or-later
@@ -15,6 +15,7 @@ namespace MFPC;
 defined( 'ABSPATH' ) || exit; // Exit if accessed directly
 
 // --- Constants ---
+define( 'MFPC_VERSION', '1.6.0' );
 define( 'MFPC_OPTION_NAME', 'mfpc_settings' );
 define( 'MFPC_PHP_CONFIG_FILE_PATH', WP_CONTENT_DIR . '/memcached-fp-config.php' );
 define( 'MFPC_NGINX_TEMPLATE_FILE_PATH', plugin_dir_path( __FILE__ ) . 'nginx-template.conf' );
@@ -230,6 +231,14 @@ function mfpc_settings_init() {
     );
 
     add_settings_field(
+        'mfpc_minify_assets_field',
+        \__( 'Minify Assets', 'mfpc-config' ),
+        __NAMESPACE__ . '\mfpc_minify_assets_field_html',
+        'mfpc-config',
+        'mfpc_general_section'
+    );
+
+    add_settings_field(
         'mfpc_purge_method_field',
         \__( 'Purge Method', 'mfpc-config' ),
         __NAMESPACE__ . '\mfpc_purge_method_field_html',
@@ -292,6 +301,7 @@ function mfpc_get_options() {
         'preload_on_save' => false,
         'pre_cache_recent_count' => 0,
         'lazy_load' => false,
+        'minify_assets' => false,
         'purge_method' => 'specific',
         'servers' => [
             ['host' => '127.0.0.1', 'port' => '11211']
@@ -622,6 +632,17 @@ function mfpc_lazy_load_field_html() {
 }
 
 /**
+ * Render Minify Assets checkbox.
+ */
+function mfpc_minify_assets_field_html() {
+    $options = mfpc_get_options();
+    ?>
+    <input type="checkbox" id="mfpc_minify_assets" name="<?php echo esc_attr(MFPC_OPTION_NAME); ?>[minify_assets]" value="1" <?php checked( 1, !empty($options['minify_assets']), true ); ?> />
+    <label for="mfpc_minify_assets"><?php esc_html_e( 'Minify HTML, inline CSS, and inline JS to reduce page size (improves performance).', 'mfpc-config' ); ?></label>
+    <?php
+}
+
+/**
  * Render Purge Method select.
  */
 function mfpc_purge_method_field_html() {
@@ -888,6 +909,7 @@ function mfpc_sanitize_settings( $input ) {
     $new_input['preload_on_save'] = isset( $input['preload_on_save'] ) ? (bool) $input['preload_on_save'] : false;
     $new_input['pre_cache_recent_count'] = isset( $input['pre_cache_recent_count'] ) ? absint( $input['pre_cache_recent_count'] ) : 0;
     $new_input['lazy_load'] = isset( $input['lazy_load'] ) ? (bool) $input['lazy_load'] : false;
+    $new_input['minify_assets'] = isset( $input['minify_assets'] ) ? (bool) $input['minify_assets'] : false;
 
     // Sanitize Purge Method
     $new_input['purge_method'] = ( isset( $input['purge_method'] ) && in_array( $input['purge_method'], ['specific', 'all'] ) ) ? $input['purge_method'] : 'specific';
@@ -992,6 +1014,7 @@ function mfpc_sanitize_settings( $input ) {
         'debug' => $new_input['debug'],
         'default_cache_time' => $new_input['default_cache_time'],
         'lazy_load' => $new_input['lazy_load'],
+        'minify_assets' => $new_input['minify_assets'],
         'servers' => $new_input['servers'],
         'rules' => $new_input['rules'],
         'content_type_rules' => $new_input['content_type_rules'],
