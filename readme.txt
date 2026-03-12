@@ -51,6 +51,10 @@ Yes, this plugin requires the `memcached` extension to be installed on your serv
 
 == Changelog ==
 
+= 1.7.1 =
+* Renamed main plugin file to memblaze-full-page-cache.php.
+* Minor version bump and maintenance.
+
 = 1.7.0 =
 * Fixed Plugin Check compliance.
 * Added missing sanitization and escaping for server variables and admin outputs.
