@@ -20,6 +20,7 @@ This system provides a robust full-page caching mechanism for WordPress sites us
     *   **On Save**: Automatically visits the post and homepage after purging to regenerate the cache.
     *   **Scheduled**: Automatically pre-cache a specified number of recent posts hourly.
     *   **WP-CLI**: Command to manually warm up the cache.
+*   **Asset Minification**: Automatically minifies HTML, inline CSS, and inline JS to reduce page size and improve Core Web Vitals.
 *   **Lazy Load (Experimental)**: Automatically adds `loading="lazy"` attributes to images and iframes to improve Core Web Vitals.
 *   **Cookie-Based Cache Bypass**: Define a list of cookie name prefixes. If a visitor has any of these cookies, the cache will be bypassed for them, ensuring dynamic content for logged-in users or users with specific session cookies (e.g., e-commerce carts).
 *   **Admin Interface & Stats**:
@@ -113,6 +114,7 @@ You need to modify your Nginx configuration to direct appropriate requests to `i
     *   **Purge Cache on Actions**: Enable to automatically clear relevant caches when posts/pages are saved, updated, or deleted.
     *   **Pre-load Cache**: Automatically visit the post and homepage after purging to regenerate the cache.
     *   **Pre-cache Recent Posts**: Number of recent posts/pages to automatically pre-cache (warm up) hourly.
+    *   **Minify Assets**: Automatically minifies HTML, inline CSS, and inline JS to reduce page size and improve Core Web Vitals.
     *   **Lazy Load**: Enable experimental lazy loading for images and iframes.
     *   **Purge Method**: Select "Purge Specific Pages" (default) or "Flush Entire Cache".
     *   **Bypass Cache for Cookies**: Add cookie name prefixes (one per line) that should cause the cache to be bypassed. Defaults include common WordPress, WooCommerce, and other plugin cookies.
