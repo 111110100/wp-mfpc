@@ -13,7 +13,7 @@ class Health_Check {
 
 	public function add_tests( $tests ) {
 		$tests['direct']['mfpc_memcached'] = [
-			'label' => \__( 'Memcached Full Page Cache', 'mfpc-config' ),
+			'label' => \__( 'Memcached Full Page Cache', 'memblaze-fpc' ),
 			'test'  => [ $this, 'test_memcached' ],
 		];
 		return $tests;
@@ -21,15 +21,15 @@ class Health_Check {
 
 	public function test_memcached() {
 		$result = [
-			'label'       => \__( 'Memcached Connection', 'mfpc-config' ),
+			'label'       => \__( 'Memcached Connection', 'memblaze-fpc' ),
 			'status'      => 'good',
 			'badge'       => [
-				'label' => \__( 'Performance', 'mfpc-config' ),
+				'label' => \__( 'Performance', 'memblaze-fpc' ),
 				'color' => 'blue',
 			],
 			'description' => sprintf(
 				'<p>%s</p>',
-				\__( 'The Memcached servers are reachable.', 'mfpc-config' )
+				\__( 'The Memcached servers are reachable.', 'memblaze-fpc' )
 			),
 			'actions'     => '',
 			'test'        => 'mfpc_memcached',
@@ -42,7 +42,7 @@ class Health_Check {
 			$result['status'] = 'recommended';
 			$result['description'] = sprintf(
 				'<p>%s</p>',
-				\__( 'No Memcached servers are configured.', 'mfpc-config' )
+				\__( 'No Memcached servers are configured.', 'memblaze-fpc' )
 			);
 			return $result;
 		}
@@ -59,7 +59,7 @@ class Health_Check {
 			$result['status'] = 'critical';
 			$result['description'] = sprintf(
 				'<p>%s</p><ul><li>%s</li></ul>',
-				\__( 'Some Memcached servers are not reachable:', 'mfpc-config' ),
+				\__( 'Some Memcached servers are not reachable:', 'memblaze-fpc' ),
 				implode( '</li><li>', $failed_servers )
 			);
 		}

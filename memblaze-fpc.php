@@ -7,7 +7,7 @@
  * Author URI:        https://erwinlomibao.com/memblaze
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
- * Text Domain:       mfpc-config
+ * Text Domain:       memblaze-fpc
  */
 
 namespace MFPC;
@@ -31,7 +31,7 @@ define( 'MFPC_NGINX_UPSTREAM_FILE_PATH', WP_CONTENT_DIR . '/memcached_upstream.c
 function mfpc_seconds_to_human_time( $seconds ) {
     $seconds = (int) $seconds;
     if ( $seconds <= 0 ) {
-        return __( 'No cache', 'mfpc-config' );
+        return __( 'No cache', 'memblaze-fpc' );
     }
 
     $periods = array(
@@ -46,16 +46,25 @@ function mfpc_seconds_to_human_time( $seconds ) {
     foreach ( $periods as $name => $secs ) {
         $count = floor( $seconds / $secs );
         if ( $count > 0 ) {
-            $parts[] = sprintf( _n( '%s ' . $name, '%s ' . $name . 's', $count, 'mfpc-config' ), $count );
+            if ( 'day' === $name ) {
+                /* translators: %s: number of days */
+                $parts[] = sprintf( _n( '%s day', '%s days', $count, 'memblaze-fpc' ), $count );
+            } elseif ( 'hour' === $name ) {
+                /* translators: %s: number of hours */
+                $parts[] = sprintf( _n( '%s hour', '%s hours', $count, 'memblaze-fpc' ), $count );
+            } elseif ( 'minute' === $name ) {
+                /* translators: %s: number of minutes */
+                $parts[] = sprintf( _n( '%s minute', '%s minutes', $count, 'memblaze-fpc' ), $count );
+            }
             $seconds -= $count * $secs;
         }
     }
 
     // If only seconds remain after calculating larger units, or if the total was less than 60
     if ($seconds > 0 || empty($parts)) {
-         $parts[] = sprintf( _n( '%s second', '%s seconds', $seconds, 'mfpc-config' ), $seconds );
+         /* translators: %s: number of seconds */
+         $parts[] = sprintf( _n( '%s second', '%s seconds', $seconds, 'memblaze-fpc' ), $seconds );
     }
-
 
     return implode( ', ', $parts );
 }
@@ -68,9 +77,9 @@ function mfpc_add_admin_menu_bar( $admin_bar ) {
         return;
     }
     $admin_bar->add_menu([
-        'id' => 'mfpc-config',
-        'title' => __( 'MemBlaze Cache', 'mfpc-config' ),
-        'href' => admin_url( 'admin.php?page=mfpc-config' ),
+        'id' => 'memblaze-fpc',
+        'title' => __( 'MemBlaze Cache', 'memblaze-fpc' ),
+        'href' => admin_url( 'admin.php?page=memblaze-fpc' ),
         'parent' => null,
         'group' => false,
         'meta' => '',
@@ -81,7 +90,7 @@ function mfpc_add_admin_menu_bar( $admin_bar ) {
         $options = mfpc_get_options();
         $memcached = mfpc_get_memcached_connection( $options['servers'] );
         if ( $memcached ) {
-            $host = $_SERVER['HTTP_HOST'] ?? parse_url( home_url(), PHP_URL_HOST );
+            $host = $_SERVER['HTTP_HOST'] ?? wp_parse_url( home_url(), PHP_URL_HOST );
             $uri = $_SERVER['REQUEST_URI'];
 
             // Check cache status
@@ -108,12 +117,12 @@ function mfpc_add_admin_menu_bar( $admin_bar ) {
                 }
             }
 
-            $status_text = $is_cached ? sprintf( __( 'Page: CACHED%s', 'mfpc-config' ), $age_suffix ) : __( 'Page: UNCACHED', 'mfpc-config' );
+            $status_text = $is_cached ? sprintf( __( 'Page: CACHED%s', 'memblaze-fpc' ), $age_suffix ) : __( 'Page: UNCACHED', 'memblaze-fpc' );
 
             $admin_bar->add_menu([
                 'id' => 'mfpc-page-status',
                 'title' => $status_text,
-                'parent' => 'mfpc-config',
+                'parent' => 'memblaze-fpc',
                 'href' => false,
             ]);
         }
@@ -127,9 +136,9 @@ function mfpc_add_admin_menu_bar( $admin_bar ) {
             );
             $admin_bar->add_menu([
                 'id' => 'mfpc-purge-current',
-                'title' => __( 'Purge Page', 'mfpc-config' ),
+                'title' => __( 'Purge Page', 'memblaze-fpc' ),
                 'href' => $url,
-                'parent' => 'mfpc-config',
+                'parent' => 'memblaze-fpc',
             ]);
         }
     }
@@ -141,26 +150,26 @@ function mfpc_add_admin_menu_bar( $admin_bar ) {
  */
 function mfpc_add_admin_menu() {
     add_menu_page(
-        __( 'MemBlaze Cache Config', 'mfpc-config' ),
-        __( 'MemBlaze Cache', 'mfpc-config' ),
+        __( 'MemBlaze Cache Config', 'memblaze-fpc' ),
+        __( 'MemBlaze Cache', 'memblaze-fpc' ),
         'manage_options',
-        'mfpc-config',
+        'memblaze-fpc',
         __NAMESPACE__ . '\mfpc_options_page_html',
         'dashicons-performance'
     );
     // Add submenu for Config (to appear as first item)
     add_submenu_page(
-        'mfpc-config',
-        __( 'MemBlaze Cache Config', 'mfpc-config' ),
-        __( 'Config', 'mfpc-config' ),
+        'memblaze-fpc',
+        __( 'MemBlaze Cache Config', 'memblaze-fpc' ),
+        __( 'Config', 'memblaze-fpc' ),
         'manage_options',
-        'mfpc-config',
+        'memblaze-fpc',
         __NAMESPACE__ . '\mfpc_options_page_html'
     );
     add_submenu_page(
-        'mfpc-config',
-        __( 'Memcached Stats', 'mfpc-config' ),
-        __( 'Stats', 'mfpc-config' ),
+        'memblaze-fpc',
+        __( 'Memcached Stats', 'memblaze-fpc' ),
+        __( 'Stats', 'memblaze-fpc' ),
         'manage_options',
         'mfpc-stats',
         __NAMESPACE__ . '\mfpc_stats_page_html'
@@ -177,105 +186,105 @@ function mfpc_settings_init() {
     // --- General Section ---
     add_settings_section(
         'mfpc_general_section',
-        __( 'General Settings', 'mfpc-config' ),
+        __( 'General Settings', 'memblaze-fpc' ),
         null,
-        'mfpc-config'
+        'memblaze-fpc'
     );
 
     add_settings_field(
         'mfpc_debug_field',
-        \__( 'Enable Debug Output', 'mfpc-config' ),
+        \__( 'Enable Debug Output', 'memblaze-fpc' ),
         __NAMESPACE__ . '\mfpc_debug_field_html',
-        'mfpc-config',
+        'memblaze-fpc',
         'mfpc_general_section'
     );
 
      add_settings_field(
         'mfpc_default_time_field',
-        \__( 'Default Cache Time', 'mfpc-config' ),
+        \__( 'Default Cache Time', 'memblaze-fpc' ),
         __NAMESPACE__ . '\mfpc_default_time_field_html',
-        'mfpc-config',
+        'memblaze-fpc',
         'mfpc_general_section'
     );
 
     add_settings_field(
         'mfpc_purge_on_save_field',
-        \__( 'Purge Cache on Actions', 'mfpc-config' ), // Renamed for clarity
+        \__( 'Purge Cache on Actions', 'memblaze-fpc' ), // Renamed for clarity
         __NAMESPACE__ . '\mfpc_purge_on_save_field_html',
-        'mfpc-config',
+        'memblaze-fpc',
         'mfpc_general_section'
     );
 
     add_settings_field(
         'mfpc_preload_on_save_field',
-        \__( 'Pre-load Cache', 'mfpc-config' ),
+        \__( 'Pre-load Cache', 'memblaze-fpc' ),
         __NAMESPACE__ . '\mfpc_preload_on_save_field_html',
-        'mfpc-config',
+        'memblaze-fpc',
         'mfpc_general_section'
     );
 
     add_settings_field(
         'mfpc_pre_cache_recent_field',
-        \__( 'Pre-cache Recent Posts', 'mfpc-config' ),
+        \__( 'Pre-cache Recent Posts', 'memblaze-fpc' ),
         __NAMESPACE__ . '\mfpc_pre_cache_recent_field_html',
-        'mfpc-config',
+        'memblaze-fpc',
         'mfpc_general_section'
     );
 
     add_settings_field(
         'mfpc_lazy_load_field',
-        \__( 'Lazy Load Images/Iframes', 'mfpc-config' ),
+        \__( 'Lazy Load Images/Iframes', 'memblaze-fpc' ),
         __NAMESPACE__ . '\mfpc_lazy_load_field_html',
-        'mfpc-config',
+        'memblaze-fpc',
         'mfpc_general_section'
     );
 
     add_settings_field(
         'mfpc_minify_assets_field',
-        \__( 'Minify Assets', 'mfpc-config' ),
+        \__( 'Minify Assets', 'memblaze-fpc' ),
         __NAMESPACE__ . '\mfpc_minify_assets_field_html',
-        'mfpc-config',
+        'memblaze-fpc',
         'mfpc_general_section'
     );
 
     add_settings_field(
         'mfpc_purge_method_field',
-        \__( 'Purge Method', 'mfpc-config' ),
+        \__( 'Purge Method', 'memblaze-fpc' ),
         __NAMESPACE__ . '\mfpc_purge_method_field_html',
-        'mfpc-config',
+        'memblaze-fpc',
         'mfpc_general_section'
     );
 
     add_settings_field(
         'mfpc_bypass_cookies_field',
-        \__( 'Bypass Cache for Cookies', 'mfpc-config' ),
+        \__( 'Bypass Cache for Cookies', 'memblaze-fpc' ),
         __NAMESPACE__ . '\mfpc_bypass_cookies_field_html',
-        'mfpc-config',
+        'memblaze-fpc',
         'mfpc_general_section'
     );
 
     // --- Servers Section ---
     add_settings_section(
         'mfpc_servers_section',
-        \__( 'Memcached Servers', 'mfpc-config' ),
+        \__( 'Memcached Servers', 'memblaze-fpc' ),
         __NAMESPACE__ . '\mfpc_servers_section_html',
-        'mfpc-config'
+        'memblaze-fpc'
     );
 
     // --- Rules Section ---
     add_settings_section(
         'mfpc_rules_section',
-        \__( 'Cache Time Rules', 'mfpc-config' ),
+        \__( 'Cache Time Rules', 'memblaze-fpc' ),
         __NAMESPACE__ . '\mfpc_rules_section_html',
-        'mfpc-config'
+        'memblaze-fpc'
     );
 
     // --- Content Type Rules Section ---
     add_settings_section(
         'mfpc_content_type_rules_section',
-        \__( 'Content Type Rules', 'mfpc-config' ),
+        \__( 'Content Type Rules', 'memblaze-fpc' ),
         __NAMESPACE__ . '\mfpc_content_type_rules_section_html',
-        'mfpc-config'
+        'memblaze-fpc'
     );
 }
 \add_action( 'admin_init', __NAMESPACE__ . '\mfpc_settings_init' );
@@ -284,7 +293,7 @@ function mfpc_settings_init() {
  * Add settings link to the plugin page.
  */
 function mfpc_settings_link( $links ) {
-    $settings_link = '<a href="' . esc_url( admin_url( 'admin.php?page=mfpc-config' ) ) . '">' . __( 'Settings', 'mfpc-config' ) . '</a>';
+    $settings_link = '<a href="' . esc_url( admin_url( 'admin.php?page=memblaze-fpc' ) ) . '">' . __( 'Settings', 'memblaze-fpc' ) . '</a>';
     array_unshift( $links, $settings_link );
     return $links;
 }
@@ -381,7 +390,7 @@ function mfpc_options_page_html() {
     // Handle Purge All Action
     if ( isset($_POST['mfpc_purge_all']) && check_admin_referer('mfpc_purge_all_action') ) {
         mfpc_purge_all_cache();
-        echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__('All cache flushed successfully.', 'mfpc-config') . '</p></div>';
+        echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__('All cache flushed successfully.', 'memblaze-fpc') . '</p></div>';
     }
     ?>
     <div class="wrap">
@@ -393,12 +402,12 @@ function mfpc_options_page_html() {
 
         if ( ! $is_nginx ) : ?>
             <div class="notice notice-warning inline">
-                <p><strong><?php esc_html_e( 'Web Server Warning:', 'mfpc-config' ); ?></strong> <?php esc_html_e( 'Nginx not detected. This plugin is optimized for Nginx.', 'mfpc-config' ); ?></p>
+                <p><strong><?php esc_html_e( 'Web Server Warning:', 'memblaze-fpc' ); ?></strong> <?php esc_html_e( 'Nginx not detected. This plugin is optimized for Nginx.', 'memblaze-fpc' ); ?></p>
                 <?php if ( $is_apache ) : ?>
-                    <p><?php esc_html_e( 'Apache/LiteSpeed detected. To enable caching, add this to the top of your .htaccess file:', 'mfpc-config' ); ?><br/><code>DirectoryIndex index-cached.php index.php</code></p>
-                    <p><em><?php esc_html_e( 'Note: Requests will be handled by PHP (index-cached.php), which is faster than WordPress but slower than Nginx direct serving.', 'mfpc-config' ); ?></em></p>
+                    <p><?php esc_html_e( 'Apache/LiteSpeed detected. To enable caching, add this to the top of your .htaccess file:', 'memblaze-fpc' ); ?><br/><code>DirectoryIndex index-cached.php index.php</code></p>
+                    <p><em><?php esc_html_e( 'Note: Requests will be handled by PHP (index-cached.php), which is faster than WordPress but slower than Nginx direct serving.', 'memblaze-fpc' ); ?></em></p>
                 <?php else : ?>
-                    <p><?php esc_html_e( 'For other web servers, configure your server to use index-cached.php as the default index file.', 'mfpc-config' ); ?></p>
+                    <p><?php esc_html_e( 'For other web servers, configure your server to use index-cached.php as the default index file.', 'memblaze-fpc' ); ?></p>
                 <?php endif; ?>
             </div>
         <?php endif; ?>
@@ -406,45 +415,47 @@ function mfpc_options_page_html() {
         <form action="options.php" method="post">
             <?php
             settings_fields( 'mfpc_options_group' );
-            do_settings_sections( 'mfpc-config' );
-            submit_button( __( 'Save Settings', 'mfpc-config' ) );
+            do_settings_sections( 'memblaze-fpc' );
+            submit_button( __( 'Save Settings', 'memblaze-fpc' ) );
             ?>
-            <button type="button" class="button" onclick="window.location.href='<?php echo esc_url(admin_url('admin.php?page=mfpc-config')); ?>';">
-                <?php esc_html_e( 'Cancel', 'mfpc-config' ); ?>
+            <button type="button" class="button" onclick="window.location.href='<?php echo esc_url(admin_url('admin.php?page=memblaze-fpc')); ?>';">
+                <?php esc_html_e( 'Cancel', 'memblaze-fpc' ); ?>
             </button>
         </form>
         <form method="post" style="margin-top: 20px; display: inline-block;">
             <?php wp_nonce_field('mfpc_purge_all_action'); ?>
             <input type="hidden" name="mfpc_purge_all" value="1">
-            <?php submit_button( __( 'Purge All Cache', 'mfpc-config' ), 'delete', 'submit', false, ['onclick' => "return confirm('" . esc_js( __( 'Are you sure you want to flush the entire Memcached cache?', 'mfpc-config' ) ) . "');"] ); ?>
+            <?php submit_button( __( 'Purge All Cache', 'memblaze-fpc' ), 'delete', 'submit', false, ['onclick' => "return confirm('" . esc_js( __( 'Are you sure you want to flush the entire Memcached cache?', 'memblaze-fpc' ) ) . "');"] ); ?>
             <p class="description" style="margin-top: 20px;">
-                <strong><?php esc_html_e( 'Professional Services:', 'mfpc-config' ); ?></strong>
-                <?php esc_html_e( 'Need help with installation, configuration, or customization? Contact me for professional services.', 'mfpc-config' ); ?>
+                <strong><?php esc_html_e( 'Professional Services:', 'memblaze-fpc' ); ?></strong>
+                <?php esc_html_e( 'Need help with installation, configuration, or customization? Contact me for professional services.', 'memblaze-fpc' ); ?>
             </p>
              <?php if ( isset( $_GET['settings-updated'] ) ) : ?>
                 <div id="setting-error-settings_updated" class="notice notice-success settings-error is-dismissible">
-                    <p><strong><?php esc_html_e( 'Settings saved.', 'mfpc-config' ); ?></strong></p>
+                    <p><strong><?php esc_html_e( 'Settings saved.', 'memblaze-fpc' ); ?></strong></p>
                     <?php if ( get_transient('mfpc_php_config_success') ) : ?>
                         <p><?php echo esc_html( get_transient('mfpc_php_config_success') ); ?></p>
                         <?php delete_transient('mfpc_php_config_success'); ?>
                     <?php endif; ?>
                     <?php if ( get_transient('mfpc_nginx_config_success') ) : ?>
                         <p><?php echo esc_html( get_transient('mfpc_nginx_config_success') ); ?></p>
-                        <p><strong><?php esc_html_e( 'Step 1:', 'mfpc-config' ); ?></strong> <?php printf(
-                                wp_kses_post( __( 'Copy %s to %s (or include it in your `http` block).', 'mfpc-config' ) ),
+                        <p><strong><?php esc_html_e( 'Step 1:', 'memblaze-fpc' ); ?></strong> <?php printf(
+                                /* translators: 1: path to upstream config file, 2: directory path */
+                                wp_kses_post( __( 'Copy %1$s to %2$s (or include it in your `http` block).', 'memblaze-fpc' ) ),
                                 '<code>' . esc_html( MFPC_NGINX_UPSTREAM_FILE_PATH ) . '</code>',
                                 '<code>/etc/nginx/conf.d/</code>'
                             ); ?></p>
-                        <p><strong><?php esc_html_e( 'Step 2:', 'mfpc-config' ); ?></strong> <?php printf(
-                                wp_kses_post( __( 'Include %s in your main Nginx configuration `server` block (e.g., using an `include %s;` directive).', 'mfpc-config' ) ),
+                        <p><strong><?php esc_html_e( 'Step 2:', 'memblaze-fpc' ); ?></strong> <?php printf(
+                                /* translators: 1: path to nginx output file, 2: include directive path */
+                                wp_kses_post( __( 'Include %1$s in your main Nginx configuration `server` block (e.g., using an `include %2$s;` directive).', 'memblaze-fpc' ) ),
                                 '<code>' . esc_html( MFPC_NGINX_OUTPUT_FILE_PATH ) . '</code>',
                                 esc_html( MFPC_NGINX_OUTPUT_FILE_PATH )
                             ); ?></p>
-                        <p><?php esc_html_e( 'After updating the Nginx configuration, you can test it with:', 'mfpc-config' ); ?>
+                        <p><?php esc_html_e( 'After updating the Nginx configuration, you can test it with:', 'memblaze-fpc' ); ?>
                             <code>nginx -t && nginx -s reload</code>
                         <?php if ( !file_exists( ABSPATH . 'index-cached.php' ) ) : ?>
-                            <p><?php esc_html_e( 'To use the full page cache, you need to copy index-cached.php to your WordPress root directory.', 'mfpc-config' ); ?></p>
-                            <code>sudo cp <?php echo esc_html( ABSPATH . 'wp-content/plugins/wp-mfpc/index-cached.php' ) ?> <?php echo esc_html( ABSPATH ) ?></code>
+                            <p><?php esc_html_e( 'To use the full page cache, you need to copy index-cached.php to your WordPress root directory.', 'memblaze-fpc' ); ?></p>
+                            <code>sudo cp <?php echo esc_html( ABSPATH . 'wp-content/plugins/memblaze-fpc/index-cached.php' ) ?> <?php echo esc_html( ABSPATH ) ?></code>
                         <?php endif; ?>
                         <?php delete_transient('mfpc_nginx_config_success'); ?>
                     <?php endif; ?>
@@ -464,7 +475,7 @@ function mfpc_options_page_html() {
             <?php endif; ?>
              <?php if ( get_transient('mfpc_purge_error') ) : ?>
                 <div class="notice notice-warning settings-error is-dismissible">
-                    <p><strong><?php esc_html_e( 'Purge Warning:', 'mfpc-config' ); ?></strong> <?php echo esc_html( get_transient('mfpc_purge_error') ); ?></p>
+                    <p><strong><?php esc_html_e( 'Purge Warning:', 'memblaze-fpc' ); ?></strong> <?php echo esc_html( get_transient('mfpc_purge_error') ); ?></p>
                 </div>
                 <?php delete_transient('mfpc_purge_error'); ?>
             <?php endif; ?>
@@ -484,24 +495,24 @@ function mfpc_stats_page_html() {
     // Handle Reset Action
     if ( isset($_POST['mfpc_reset_stats']) && check_admin_referer('mfpc_reset_stats_action') ) {
         mfpc_reset_stats();
-        echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__('Statistics have been reset.', 'mfpc-config') . '</p></div>';
+        echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__('Statistics have been reset.', 'memblaze-fpc') . '</p></div>';
     }
 
     ?>
     <div class="wrap">
-        <h1><?php esc_html_e( 'Memcached Statistics', 'mfpc-config' ); ?></h1>
+        <h1><?php esc_html_e( 'Memcached Statistics', 'memblaze-fpc' ); ?></h1>
         <?php mfpc_render_stats_widget( true ); ?>
 
         <?php if ( $last_purged = get_transient('mfpc_last_purge_keys') ) : ?>
             <div class="notice notice-info is-dismissible" style="margin-top: 20px;">
-                <p><strong><?php esc_html_e( 'Last Purged Keys:', 'mfpc-config' ); ?></strong><br/><code style="display:block; margin-top:5px;"><?php echo nl2br(esc_html( $last_purged )); ?></code></p>
+                <p><strong><?php esc_html_e( 'Last Purged Keys:', 'memblaze-fpc' ); ?></strong><br/><code style="display:block; margin-top:5px;"><?php echo nl2br(esc_html( $last_purged )); ?></code></p>
             </div>
         <?php endif; ?>
 
         <form method="post" style="margin-top: 20px;">
             <?php wp_nonce_field('mfpc_reset_stats_action'); ?>
             <input type="hidden" name="mfpc_reset_stats" value="1">
-            <?php submit_button( __( 'Reset Stats', 'mfpc-config' ), 'secondary', 'submit', false ); ?>
+            <?php submit_button( __( 'Reset Stats', 'memblaze-fpc' ), 'secondary', 'submit', false ); ?>
         </form>
     </div>
     <?php
@@ -518,15 +529,15 @@ function mfpc_render_stats_widget( $detailed = false ) {
     <div class="card" style="max-width: 100%; margin-top: 20px;">
         <?php if ( $detailed && !empty($stats['server_stats']) ) : ?>
             <hr style="margin: 20px 0;">
-            <h3><?php esc_html_e( 'Memcached Server Details', 'mfpc-config' ); ?></h3>
+            <h3><?php esc_html_e( 'Memcached Server Details', 'memblaze-fpc' ); ?></h3>
             <table class="widefat striped">
                 <thead>
                     <tr>
-                        <th><?php esc_html_e( 'Server', 'mfpc-config' ); ?></th>
-                        <th><?php esc_html_e( 'Uptime', 'mfpc-config' ); ?></th>
-                        <th><?php esc_html_e( 'Curr Items', 'mfpc-config' ); ?></th>
-                        <th><?php esc_html_e( 'Bytes Used', 'mfpc-config' ); ?></th>
-                        <th><?php esc_html_e( 'Connections', 'mfpc-config' ); ?></th>
+                        <th><?php esc_html_e( 'Server', 'memblaze-fpc' ); ?></th>
+                        <th><?php esc_html_e( 'Uptime', 'memblaze-fpc' ); ?></th>
+                        <th><?php esc_html_e( 'Curr Items', 'memblaze-fpc' ); ?></th>
+                        <th><?php esc_html_e( 'Bytes Used', 'memblaze-fpc' ); ?></th>
+                        <th><?php esc_html_e( 'Connections', 'memblaze-fpc' ); ?></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -555,7 +566,7 @@ function mfpc_reset_stats() {
     if ( $memcached ) {
         // Use the same prefix logic as index-cached.php
         // Note: index-cached.php uses $_SERVER['HTTP_HOST']. We assume admin is on same host.
-        $host = $_SERVER['HTTP_HOST'] ?? parse_url( home_url(), PHP_URL_HOST );
+        $host = $_SERVER['HTTP_HOST'] ?? wp_parse_url( home_url(), PHP_URL_HOST );
         $prefix = "mfpc:stats:{$host}:";
 
         $memcached->delete( $prefix . 'hits' );
@@ -571,7 +582,7 @@ function mfpc_debug_field_html() {
     $options = mfpc_get_options();
     ?>
     <input type="checkbox" id="mfpc_debug" name="<?php echo esc_attr(MFPC_OPTION_NAME); ?>[debug]" value="1" <?php checked( 1, $options['debug'], true ); ?> />
-    <label for="mfpc_debug"><?php esc_html_e( 'Add HTML comment with cache status and timing to page source (in index-cached.php). Also enables PHP error logging for purge actions.', 'mfpc-config' ); ?></label>
+    <label for="mfpc_debug"><?php esc_html_e( 'Add HTML comment with cache status and timing to page source (in index-cached.php). Also enables PHP error logging for purge actions.', 'memblaze-fpc' ); ?></label>
     <?php
 }
 
@@ -582,7 +593,7 @@ function mfpc_default_time_field_html() {
     $options = mfpc_get_options();
     ?>
     <input type="number" min="0" step="1" id="mfpc_default_cache_time" name="<?php echo esc_attr(MFPC_OPTION_NAME); ?>[default_cache_time]" value="<?php echo esc_attr( $options['default_cache_time'] ); ?>" class="small-text" />
-    <p class="description"><?php esc_html_e( 'Default cache time in seconds if no specific rule matches. Set to 0 to disable caching by default.', 'mfpc-config' ); ?></p>
+    <p class="description"><?php esc_html_e( 'Default cache time in seconds if no specific rule matches. Set to 0 to disable caching by default.', 'memblaze-fpc' ); ?></p>
     <?php
 }
 
@@ -593,8 +604,8 @@ function mfpc_purge_on_save_field_html() {
     $options = mfpc_get_options();
     ?>
     <input type="checkbox" id="mfpc_purge_on_save" name="<?php echo esc_attr(MFPC_OPTION_NAME); ?>[purge_on_save]" value="1" <?php checked( 1, $options['purge_on_save'], true ); ?> />
-    <label for="mfpc_purge_on_save"><?php esc_html_e( 'Purge cache for a post and related pages (homepage, archives) when a post is saved/deleted, or when a comment is created/updated.', 'mfpc-config' ); ?></label>
-    <p class="description"><?php esc_html_e( 'Requires Memcached connection details below to be correct.', 'mfpc-config' ); ?></p>
+    <label for="mfpc_purge_on_save"><?php esc_html_e( 'Purge cache for a post and related pages (homepage, archives) when a post is saved/deleted, or when a comment is created/updated.', 'memblaze-fpc' ); ?></label>
+    <p class="description"><?php esc_html_e( 'Requires Memcached connection details below to be correct.', 'memblaze-fpc' ); ?></p>
     <?php
 }
 
@@ -605,7 +616,7 @@ function mfpc_preload_on_save_field_html() {
     $options = mfpc_get_options();
     ?>
     <input type="checkbox" id="mfpc_preload_on_save" name="<?php echo esc_attr(MFPC_OPTION_NAME); ?>[preload_on_save]" value="1" <?php checked( 1, !empty($options['preload_on_save']), true ); ?> />
-    <label for="mfpc_preload_on_save"><?php esc_html_e( 'Automatically visit (pre-load) the post and homepage after purging to regenerate the cache.', 'mfpc-config' ); ?></label>
+    <label for="mfpc_preload_on_save"><?php esc_html_e( 'Automatically visit (pre-load) the post and homepage after purging to regenerate the cache.', 'memblaze-fpc' ); ?></label>
     <?php
 }
 
@@ -616,7 +627,7 @@ function mfpc_pre_cache_recent_field_html() {
     $options = mfpc_get_options();
     ?>
     <input type="number" min="0" step="1" id="mfpc_pre_cache_recent_count" name="<?php echo esc_attr(MFPC_OPTION_NAME); ?>[pre_cache_recent_count]" value="<?php echo esc_attr( $options['pre_cache_recent_count'] ); ?>" class="small-text" />
-    <p class="description"><?php esc_html_e( 'Number of recent posts/pages to automatically pre-cache (warm up) hourly. Set to 0 to disable.', 'mfpc-config' ); ?></p>
+    <p class="description"><?php esc_html_e( 'Number of recent posts/pages to automatically pre-cache (warm up) hourly. Set to 0 to disable.', 'memblaze-fpc' ); ?></p>
     <?php
 }
 
@@ -627,7 +638,7 @@ function mfpc_lazy_load_field_html() {
     $options = mfpc_get_options();
     ?>
     <input type="checkbox" id="mfpc_lazy_load" name="<?php echo esc_attr(MFPC_OPTION_NAME); ?>[lazy_load]" value="1" <?php checked( 1, !empty($options['lazy_load']), true ); ?> />
-    <label for="mfpc_lazy_load"><?php esc_html_e( 'Add native `loading="lazy"` attribute to images and iframes that are missing it (improves Core Web Vitals) EXPERIMENTAL.', 'mfpc-config' ); ?></label>
+    <label for="mfpc_lazy_load"><?php esc_html_e( 'Add native `loading="lazy"` attribute to images and iframes that are missing it (improves Core Web Vitals) EXPERIMENTAL.', 'memblaze-fpc' ); ?></label>
     <?php
 }
 
@@ -638,7 +649,7 @@ function mfpc_minify_assets_field_html() {
     $options = mfpc_get_options();
     ?>
     <input type="checkbox" id="mfpc_minify_assets" name="<?php echo esc_attr(MFPC_OPTION_NAME); ?>[minify_assets]" value="1" <?php checked( 1, !empty($options['minify_assets']), true ); ?> />
-    <label for="mfpc_minify_assets"><?php esc_html_e( 'Minify HTML, inline CSS, and inline JS to reduce page size (improves performance).', 'mfpc-config' ); ?></label>
+    <label for="mfpc_minify_assets"><?php esc_html_e( 'Minify HTML, inline CSS, and inline JS to reduce page size (improves performance).', 'memblaze-fpc' ); ?></label>
     <?php
 }
 
@@ -649,10 +660,10 @@ function mfpc_purge_method_field_html() {
     $options = mfpc_get_options();
     ?>
     <select id="mfpc_purge_method" name="<?php echo esc_attr(MFPC_OPTION_NAME); ?>[purge_method]">
-        <option value="specific" <?php selected( $options['purge_method'], 'specific' ); ?>><?php esc_html_e( 'Purge Specific Pages (Post + Home + Archives)', 'mfpc-config' ); ?></option>
-        <option value="all" <?php selected( $options['purge_method'], 'all' ); ?>><?php esc_html_e( 'Flush Entire Cache', 'mfpc-config' ); ?></option>
+        <option value="specific" <?php selected( $options['purge_method'], 'specific' ); ?>><?php esc_html_e( 'Purge Specific Pages (Post + Home + Archives)', 'memblaze-fpc' ); ?></option>
+        <option value="all" <?php selected( $options['purge_method'], 'all' ); ?>><?php esc_html_e( 'Flush Entire Cache', 'memblaze-fpc' ); ?></option>
     </select>
-    <p class="description"><?php esc_html_e( 'Select "Flush Entire Cache" if you experience issues with stale content appearing after updates.', 'mfpc-config' ); ?></p>
+    <p class="description"><?php esc_html_e( 'Select "Flush Entire Cache" if you experience issues with stale content appearing after updates.', 'memblaze-fpc' ); ?></p>
     <?php
 }
 
@@ -667,7 +678,7 @@ function mfpc_bypass_cookies_field_html() {
     ?>
     <textarea id="mfpc_bypass_cookies" name="<?php echo esc_attr(MFPC_OPTION_NAME); ?>[bypass_cookies_text]" rows="10" cols="50" class="large-text code"><?php echo esc_textarea( $bypass_cookies_string ); ?></textarea>
     <p class="description">
-        <?php esc_html_e( 'Enter cookie name prefixes, one per line. If a visitor has any cookie starting with one of these prefixes, the full page cache will be bypassed for them. For example, "wordpress_logged_in_" or "comment_author_".', 'mfpc-config' ); ?>
+        <?php esc_html_e( 'Enter cookie name prefixes, one per line. If a visitor has any cookie starting with one of these prefixes, the full page cache will be bypassed for them. For example, "wordpress_logged_in_" or "comment_author_".', 'memblaze-fpc' ); ?>
     </p>
     <?php
 }
@@ -677,15 +688,15 @@ function mfpc_bypass_cookies_field_html() {
  */
 function mfpc_servers_section_html() {
     ?>
-    <p><?php esc_html_e( 'Add Memcached server addresses and ports. Use the full path for socket connections (e.g., /var/run/memcached.sock) and set port to 0.', 'mfpc-config' ); ?></p>
-    <p><?php esc_html_e( 'These servers will be used for purging and generating the Nginx upstream configuration.', 'mfpc-config' ); ?></p>
+    <p><?php esc_html_e( 'Add Memcached server addresses and ports. Use the full path for socket connections (e.g., /var/run/memcached.sock) and set port to 0.', 'memblaze-fpc' ); ?></p>
+    <p><?php esc_html_e( 'These servers will be used for purging and generating the Nginx upstream configuration.', 'memblaze-fpc' ); ?></p>
     <table class="wp-list-table widefat fixed striped" id="mfpc-servers-table">
         <thead>
             <tr>
-                <th scope="col" style="width: 45%;"><?php esc_html_e( 'Memcached Server/Socket Path', 'mfpc-config' ); ?></th>
-                <th scope="col" style="width: 15%;"><?php esc_html_e( 'Port (0 for socket)', 'mfpc-config' ); ?></th>
-                <th scope="col" style="width: 20%;"><?php esc_html_e( 'Status', 'mfpc-config' ); ?></th> <?php // New Header ?>
-                <th scope="col" style="width: 10%;"><?php esc_html_e( 'Actions', 'mfpc-config' ); ?></th>
+                <th scope="col" style="width: 45%;"><?php esc_html_e( 'Memcached Server/Socket Path', 'memblaze-fpc' ); ?></th>
+                <th scope="col" style="width: 15%;"><?php esc_html_e( 'Port (0 for socket)', 'memblaze-fpc' ); ?></th>
+                <th scope="col" style="width: 20%;"><?php esc_html_e( 'Status', 'memblaze-fpc' ); ?></th> <?php // New Header ?>
+                <th scope="col" style="width: 10%;"><?php esc_html_e( 'Actions', 'memblaze-fpc' ); ?></th>
             </tr>
         </thead>
         <tbody id="mfpc-servers-body">
@@ -699,7 +710,7 @@ function mfpc_servers_section_html() {
                         <td><input type="text" name="<?php echo esc_attr(MFPC_OPTION_NAME); ?>[servers][<?php echo $index; ?>][host]" value="<?php echo esc_attr( $server['host'] ); ?>" class="regular-text" required /></td>
                         <td><input type="text" name="<?php echo esc_attr(MFPC_OPTION_NAME); ?>[servers][<?php echo $index; ?>][port]" value="<?php echo esc_attr( $server['port'] ); ?>" class="small-text" required /></td>
                         <td class="mfpc-server-status <?php echo esc_attr( $status_info['class'] ); ?>"><?php echo esc_html( $status_info['message'] ); ?></td> <?php // New Cell ?>
-                        <td><button type="button" class="button mfpc-remove-row"><?php esc_html_e( 'Delete', 'mfpc-config' ); ?></button></td>
+                        <td><button type="button" class="button mfpc-remove-row"><?php esc_html_e( 'Delete', 'memblaze-fpc' ); ?></button></td>
                     </tr>
                     <?php
                 endforeach;
@@ -709,7 +720,7 @@ function mfpc_servers_section_html() {
                      <td><input type="text" name="<?php echo esc_attr(MFPC_OPTION_NAME); ?>[servers][0][host]" value="" class="regular-text" required /></td>
                      <td><input type="text" name="<?php echo esc_attr(MFPC_OPTION_NAME); ?>[servers][0][port]" value="" class="small-text" required /></td>
                      <td class="mfpc-server-status"></td> <?php // New Cell - Blank ?>
-                     <td><button type="button" class="button mfpc-remove-row"><?php esc_html_e( 'Delete', 'mfpc-config' ); ?></button></td>
+                     <td><button type="button" class="button mfpc-remove-row"><?php esc_html_e( 'Delete', 'memblaze-fpc' ); ?></button></td>
                  </tr>
                  <?php
             endif;
@@ -718,7 +729,7 @@ function mfpc_servers_section_html() {
         <tfoot>
             <tr>
                 <td colspan="4"> <?php // Updated colspan ?>
-                    <button type="button" class="button" id="mfpc-add-server"><?php esc_html_e( 'Add Server', 'mfpc-config' ); ?></button>
+                    <button type="button" class="button" id="mfpc-add-server"><?php esc_html_e( 'Add Server', 'memblaze-fpc' ); ?></button>
                 </td>
             </tr>
         </tfoot>
@@ -730,7 +741,7 @@ function mfpc_servers_section_html() {
              <td><input type="text" name="" value="" class="regular-text" required /></td>
              <td><input type="text" name="" value="" class="small-text" required /></td>
              <td class="mfpc-server-status"></td> <?php // New Cell - Template ?>
-             <td><button type="button" class="button mfpc-remove-row"><?php esc_html_e( 'Delete', 'mfpc-config' ); ?></button></td>
+             <td><button type="button" class="button mfpc-remove-row"><?php esc_html_e( 'Delete', 'memblaze-fpc' ); ?></button></td>
          </tr>
     </template>
     <?php
@@ -741,14 +752,14 @@ function mfpc_servers_section_html() {
  */
 function mfpc_rules_section_html() {
      ?>
-    <p><?php esc_html_e( 'Define specific cache times for URI paths. Rules are checked in order. Use simple string matching (e.g., "/category/" matches any URL containing "/category/").', 'mfpc-config' ); ?></p>
+    <p><?php esc_html_e( 'Define specific cache times for URI paths. Rules are checked in order. Use simple string matching (e.g., "/category/" matches any URL containing "/category/").', 'memblaze-fpc' ); ?></p>
     <table class="wp-list-table widefat fixed striped" id="mfpc-rules-table">
         <thead>
             <tr>
-                <th scope="col" style="width: 40%;"><?php esc_html_e( 'URI Path Contains', 'mfpc-config' ); ?></th>
-                <th scope="col" style="width: 15%;"><?php esc_html_e( 'Time in Seconds', 'mfpc-config' ); ?></th>
-                <th scope="col" style="width: 25%;"><?php esc_html_e( 'Approximate Time', 'mfpc-config' ); ?></th>
-                <th scope="col" style="width: 10%;"><?php esc_html_e( 'Actions', 'mfpc-config' ); ?></th>
+                <th scope="col" style="width: 40%;"><?php esc_html_e( 'URI Path Contains', 'memblaze-fpc' ); ?></th>
+                <th scope="col" style="width: 15%;"><?php esc_html_e( 'Time in Seconds', 'memblaze-fpc' ); ?></th>
+                <th scope="col" style="width: 25%;"><?php esc_html_e( 'Approximate Time', 'memblaze-fpc' ); ?></th>
+                <th scope="col" style="width: 10%;"><?php esc_html_e( 'Actions', 'memblaze-fpc' ); ?></th>
             </tr>
         </thead>
         <tbody id="mfpc-rules-body">
@@ -761,7 +772,7 @@ function mfpc_rules_section_html() {
                         <td><input type="text" name="<?php echo esc_attr(MFPC_OPTION_NAME); ?>[rules][<?php echo $index; ?>][path]" value="<?php echo esc_attr( $rule['path'] ); ?>" class="regular-text" required /></td>
                         <td><input type="number" min="0" step="1" name="<?php echo esc_attr(MFPC_OPTION_NAME); ?>[rules][<?php echo $index; ?>][time]" value="<?php echo esc_attr( $rule['time'] ); ?>" class="small-text mfpc-time-input" required /></td>
                         <td class="mfpc-human-time"><?php echo esc_html( mfpc_seconds_to_human_time( $rule['time'] ) ); ?></td>
-                        <td><button type="button" class="button mfpc-remove-row"><?php esc_html_e( 'Delete', 'mfpc-config' ); ?></button></td>
+                        <td><button type="button" class="button mfpc-remove-row"><?php esc_html_e( 'Delete', 'memblaze-fpc' ); ?></button></td>
                     </tr>
                     <?php
                 endforeach;
@@ -771,7 +782,7 @@ function mfpc_rules_section_html() {
                      <td><input type="text" name="<?php echo esc_attr(MFPC_OPTION_NAME); ?>[rules][0][path]" value="" class="regular-text" required /></td>
                      <td><input type="number" min="0" step="1" name="<?php echo esc_attr(MFPC_OPTION_NAME); ?>[rules][0][time]" value="" class="small-text mfpc-time-input" required /></td>
                      <td class="mfpc-human-time"><?php echo esc_html( mfpc_seconds_to_human_time( 0 ) ); ?></td>
-                     <td><button type="button" class="button mfpc-remove-row"><?php esc_html_e( 'Delete', 'mfpc-config' ); ?></button></td>
+                     <td><button type="button" class="button mfpc-remove-row"><?php esc_html_e( 'Delete', 'memblaze-fpc' ); ?></button></td>
                  </tr>
                  <?php
              endif;
@@ -780,7 +791,7 @@ function mfpc_rules_section_html() {
         <tfoot>
             <tr>
                 <td colspan="4">
-                    <button type="button" class="button" id="mfpc-add-rule"><?php esc_html_e( 'Add Rule', 'mfpc-config' ); ?></button>
+                    <button type="button" class="button" id="mfpc-add-rule"><?php esc_html_e( 'Add Rule', 'memblaze-fpc' ); ?></button>
                 </td>
             </tr>
         </tfoot>
@@ -792,7 +803,7 @@ function mfpc_rules_section_html() {
              <td><input type="text" name="" value="" class="regular-text" required /></td>
              <td><input type="number" min="0" step="1" name="" value="" class="small-text mfpc-time-input" required /></td>
              <td class="mfpc-human-time"><?php echo esc_html( mfpc_seconds_to_human_time( 0 ) ); ?></td>
-             <td><button type="button" class="button mfpc-remove-row"><?php esc_html_e( 'Delete', 'mfpc-config' ); ?></button></td>
+             <td><button type="button" class="button mfpc-remove-row"><?php esc_html_e( 'Delete', 'memblaze-fpc' ); ?></button></td>
          </tr>
     </template>
      <?php
@@ -803,13 +814,13 @@ function mfpc_rules_section_html() {
  */
 function mfpc_content_type_rules_section_html() {
     ?>
-    <p><?php esc_html_e( 'Define specific Content-Types for URI paths. Useful for API endpoints or feeds. These rules override the default text/html.', 'mfpc-config' ); ?></p>
+    <p><?php esc_html_e( 'Define specific Content-Types for URI paths. Useful for API endpoints or feeds. These rules override the default text/html.', 'memblaze-fpc' ); ?></p>
     <table class="wp-list-table widefat fixed striped" id="mfpc-content-type-rules-table">
         <thead>
             <tr>
-                <th scope="col" style="width: 45%;"><?php esc_html_e( 'URI Path Contains', 'mfpc-config' ); ?></th>
-                <th scope="col" style="width: 45%;"><?php esc_html_e( 'Content Type', 'mfpc-config' ); ?></th>
-                <th scope="col" style="width: 10%;"><?php esc_html_e( 'Actions', 'mfpc-config' ); ?></th>
+                <th scope="col" style="width: 45%;"><?php esc_html_e( 'URI Path Contains', 'memblaze-fpc' ); ?></th>
+                <th scope="col" style="width: 45%;"><?php esc_html_e( 'Content Type', 'memblaze-fpc' ); ?></th>
+                <th scope="col" style="width: 10%;"><?php esc_html_e( 'Actions', 'memblaze-fpc' ); ?></th>
             </tr>
         </thead>
         <tbody id="mfpc-content-type-rules-body">
@@ -837,7 +848,7 @@ function mfpc_content_type_rules_section_html() {
                                 <?php endforeach; ?>
                             </select>
                         </td>
-                        <td><button type="button" class="button mfpc-remove-row"><?php esc_html_e( 'Delete', 'mfpc-config' ); ?></button></td>
+                        <td><button type="button" class="button mfpc-remove-row"><?php esc_html_e( 'Delete', 'memblaze-fpc' ); ?></button></td>
                     </tr>
                     <?php
                 endforeach;
@@ -847,7 +858,7 @@ function mfpc_content_type_rules_section_html() {
         <tfoot>
             <tr>
                 <td colspan="3">
-                    <button type="button" class="button" id="mfpc-add-content-type-rule"><?php esc_html_e( 'Add Rule', 'mfpc-config' ); ?></button>
+                    <button type="button" class="button" id="mfpc-add-content-type-rule"><?php esc_html_e( 'Add Rule', 'memblaze-fpc' ); ?></button>
                 </td>
             </tr>
         </tfoot>
@@ -878,7 +889,7 @@ function mfpc_content_type_rules_section_html() {
                 '<td><select name="' + optionName + '[content_type_rules][' + index + '][content_type]">' +
                 <?php foreach ( $content_types as $ct ) : ?>'<option value="<?php echo esc_js( $ct ); ?>"><?php echo esc_js( $ct ); ?></option>' +<?php endforeach; ?>
                 '</select></td>' +
-                '<td><button type="button" class="button mfpc-remove-row"><?php esc_html_e( 'Delete', 'mfpc-config' ); ?></button></td>' +
+                '<td><button type="button" class="button mfpc-remove-row"><?php esc_html_e( 'Delete', 'memblaze-fpc' ); ?></button></td>' +
                 '</tr>';
             $('#mfpc-content-type-rules-body').append(rowHtml);
         });
@@ -1026,17 +1037,19 @@ function mfpc_sanitize_settings( $input ) {
     $php_config_content .= "// Config for index-cached.php\n";
     $php_config_content .= "// Do not edit manually!\n\n";
     $php_config_content .= "defined( 'ABSPATH' ) || defined( 'MFPC_CACHE_LOADED' ) || exit; // Prevent direct access\n\n";
-    $php_config_content .= "return " . var_export( $config_for_php_file, true ) . ";\n";
+    $php_config_content .= "return " . mfpc_var_export( $config_for_php_file, true ) . ";\n";
 
     $write_php_result = file_put_contents( MFPC_PHP_CONFIG_FILE_PATH, $php_config_content );
 
     if ( $write_php_result === false ) {
-        $error_msg = sprintf( __( 'Error: Could not write PHP configuration file to %s. Please check file permissions.', 'mfpc-config' ), MFPC_PHP_CONFIG_FILE_PATH );
+        /* translators: %s: path to PHP config file */
+        $error_msg = sprintf( __( 'Error: Could not write PHP configuration file to %s. Please check file permissions.', 'memblaze-fpc' ), MFPC_PHP_CONFIG_FILE_PATH );
         add_settings_error( MFPC_OPTION_NAME, 'php_config_write_error', $error_msg, 'error' );
         set_transient('mfpc_php_config_error', $error_msg, 60);
     } else {
         delete_transient('mfpc_php_config_error');
-        set_transient('mfpc_php_config_success', sprintf( __( 'PHP config file generated successfully at %s.', 'mfpc-config' ), MFPC_PHP_CONFIG_FILE_PATH ), 60);
+        /* translators: %s: path to PHP config file */
+        set_transient('mfpc_php_config_success', sprintf( __( 'PHP config file generated successfully at %s.', 'memblaze-fpc' ), MFPC_PHP_CONFIG_FILE_PATH ), 60);
     }
 
     // --- Generate Nginx Config File ---
@@ -1058,19 +1071,19 @@ function mfpc_sanitize_settings( $input ) {
                         $upstream_block .= "    server unix:" . $host . ";\n";
                         $has_valid_server = true;
                     } else {
-                         if ($new_input['debug']) error_log("MFPC Nginx Gen: Skipping non-existent socket for upstream: " . $host);
+                         if ($new_input['debug']) mfpc_log("MFPC Nginx Gen: Skipping non-existent socket for upstream: " . $host);
                     }
                 } elseif ( ctype_digit( $port ) && $port > 0 ) {
                     $upstream_block .= "    server " . $host . ":" . $port . ";\n";
                     $has_valid_server = true;
                 } else {
-                    if ($new_input['debug']) error_log("MFPC Nginx Gen: Skipping invalid server entry for upstream: Host={$host}, Port={$port}");
+                    if ($new_input['debug']) mfpc_log("MFPC Nginx Gen: Skipping invalid server entry for upstream: Host={$host}, Port={$port}");
                 }
             }
             // Add a fallback if no valid servers were found, to prevent Nginx errors
             if (!$has_valid_server) {
                  $upstream_block .= "    server 127.0.0.1:11211; # Fallback - no valid servers configured\n";
-                 if ($new_input['debug']) error_log("MFPC Nginx Gen: No valid servers found, adding fallback 127.0.0.1:11211 to upstream block.");
+                 if ($new_input['debug']) mfpc_log("MFPC Nginx Gen: No valid servers found, adding fallback 127.0.0.1:11211 to upstream block.");
             }
 
             $upstream_block .= "}\n";
@@ -1081,21 +1094,24 @@ function mfpc_sanitize_settings( $input ) {
             $write_nginx_result = file_put_contents( MFPC_NGINX_OUTPUT_FILE_PATH, $nginx_config_content );
 
             if ( $write_nginx_result === false || $write_upstream_result === false ) {
-                $error_msg = sprintf( __( 'Error: Could not write Nginx configuration files. Check permissions for %s and %s.', 'mfpc-config' ), MFPC_NGINX_OUTPUT_FILE_PATH, MFPC_NGINX_UPSTREAM_FILE_PATH );
+                /* translators: 1: path to nginx output file, 2: path to nginx upstream config file */
+                $error_msg = sprintf( __( 'Error: Could not write Nginx configuration files. Check permissions for %1$s and %2$s.', 'memblaze-fpc' ), MFPC_NGINX_OUTPUT_FILE_PATH, MFPC_NGINX_UPSTREAM_FILE_PATH );
                 add_settings_error( MFPC_OPTION_NAME, 'nginx_config_write_error', $error_msg, 'error' );
                 set_transient('mfpc_nginx_config_error', $error_msg, 60);
             } else {
                 delete_transient('mfpc_nginx_config_error');
-                set_transient('mfpc_nginx_config_success', sprintf( __( 'Nginx config files generated successfully.', 'mfpc-config' ) ), 60);
+                set_transient('mfpc_nginx_config_success', sprintf( __( 'Nginx config files generated successfully.', 'memblaze-fpc' ) ), 60);
                 $nginx_config_generated = true;
             }
         } else {
-            $error_msg = sprintf( __( 'Error: Could not read Nginx template file from %s.', 'mfpc-config' ), MFPC_NGINX_TEMPLATE_FILE_PATH );
+            /* translators: %s: path to nginx template file */
+            $error_msg = sprintf( __( 'Error: Could not read Nginx template file from %s.', 'memblaze-fpc' ), MFPC_NGINX_TEMPLATE_FILE_PATH );
             add_settings_error( MFPC_OPTION_NAME, 'nginx_template_read_error', $error_msg, 'error' );
             set_transient('mfpc_nginx_config_error', $error_msg, 60);
         }
     } else {
-        $error_msg = sprintf( __( 'Error: Nginx template file not found at %s.', 'mfpc-config' ), MFPC_NGINX_TEMPLATE_FILE_PATH );
+        /* translators: %s: path to nginx template file */
+        $error_msg = sprintf( __( 'Error: Nginx template file not found at %s.', 'memblaze-fpc' ), MFPC_NGINX_TEMPLATE_FILE_PATH );
         add_settings_error( MFPC_OPTION_NAME, 'nginx_template_missing_error', $error_msg, 'error' );
         set_transient('mfpc_nginx_config_error', $error_msg, 60);
     }
@@ -1114,7 +1130,7 @@ function mfpc_sanitize_settings( $input ) {
  */
 function mfpc_enqueue_admin_scripts( $hook_suffix ) {
     // Only load on our specific settings page
-    if ( strpos($hook_suffix, 'mfpc-config') === false ) {
+    if ( strpos($hook_suffix, 'memblaze-fpc') === false ) {
         return;
     }
 
@@ -1122,7 +1138,7 @@ function mfpc_enqueue_admin_scripts( $hook_suffix ) {
 
     $script_data = array(
         'optionName' => MFPC_OPTION_NAME,
-        'noCacheText' => __( 'No cache', 'mfpc-config' ),
+        'noCacheText' => __( 'No cache', 'memblaze-fpc' ),
         'ajax_url' => admin_url( 'admin-ajax.php' ), // Needed for potential future AJAX actions
         'nonce' => wp_create_nonce( 'mfpc_admin_nonce' ) // Nonce for security
     );
@@ -1150,11 +1166,11 @@ function mfpc_enqueue_admin_scripts( $hook_suffix ) {
  */
 function mfpc_check_server_status( $server ) {
     if ( ! class_exists('\Memcached') ) {
-        return ['message' => __( 'Memcached PECL extension not loaded.', 'mfpc-config' ), 'class' => 'status-error'];
+        return ['message' => __( 'Memcached PECL extension not loaded.', 'memblaze-fpc' ), 'class' => 'status-error'];
     }
 
     if ( ! isset( $server['host'], $server['port'] ) ) {
-         return ['message' => __( 'Invalid server config.', 'mfpc-config' ), 'class' => 'status-error'];
+         return ['message' => __( 'Invalid server config.', 'memblaze-fpc' ), 'class' => 'status-error'];
     }
 
     $host = $server['host'];
@@ -1164,10 +1180,10 @@ function mfpc_check_server_status( $server ) {
 
     // Basic validation before attempting connection
     if ( $is_socket && ! file_exists( $host ) ) {
-        return ['message' => __( 'Socket file not found.', 'mfpc-config' ), 'class' => 'status-error'];
+        return ['message' => __( 'Socket file not found.', 'memblaze-fpc' ), 'class' => 'status-error'];
     }
     if ( ! $is_socket && ($int_port <= 0 || $int_port > 65535) ) {
-        return ['message' => __( 'Invalid port.', 'mfpc-config' ), 'class' => 'status-error'];
+        return ['message' => __( 'Invalid port.', 'memblaze-fpc' ), 'class' => 'status-error'];
     }
 
     $memcached = new \Memcached();
@@ -1181,7 +1197,7 @@ function mfpc_check_server_status( $server ) {
     if ( ! $added ) {
         // addServer returning false usually means it couldn't resolve or immediately connect
         $memcached->quit(); // Ensure closed
-        return ['message' => __( 'Failed (Add Server)', 'mfpc-config' ), 'class' => 'status-error'];
+        return ['message' => __( 'Failed (Add Server)', 'memblaze-fpc' ), 'class' => 'status-error'];
     }
 
     // Try a lightweight command like getStats()
@@ -1192,10 +1208,10 @@ function mfpc_check_server_status( $server ) {
 
     if ( $stats === false ) {
         // If getStats fails after addServer succeeded, it indicates a problem during communication
-        return ['message' => __( 'Failed (Get Stats)', 'mfpc-config' ), 'class' => 'status-error'];
+        return ['message' => __( 'Failed (Get Stats)', 'memblaze-fpc' ), 'class' => 'status-error'];
     } else {
         // If getStats returns an array (even empty), the connection was successful
-        return ['message' => __( 'Connected', 'mfpc-config' ), 'class' => 'status-ok'];
+        return ['message' => __( 'Connected', 'memblaze-fpc' ), 'class' => 'status-ok'];
     }
 }
 
@@ -1212,7 +1228,7 @@ function mfpc_check_server_status( $server ) {
  */
 function mfpc_get_memcached_connection( $servers, $debug = false ) {
     if ( ! class_exists('\Memcached') ) {
-        if ($debug) error_log("MFPC Purge: Memcached class not found.");
+        if ($debug) mfpc_log("MFPC Purge: Memcached class not found.");
         return null;
     }
 
@@ -1225,7 +1241,7 @@ function mfpc_get_memcached_connection( $servers, $debug = false ) {
          // Optionally verify server statuses here if needed, but can add overhead
          // $stats = $memcached->getStats();
          // if (empty($stats)) { /* Handle potentially dead persistent connection */ }
-         if ($debug) error_log("MFPC Purge: Reusing persistent Memcached connection (ID: {$persistent_id}).");
+         if ($debug) mfpc_log("MFPC Purge: Reusing persistent Memcached connection (ID: {$persistent_id}).");
          return $memcached;
     }
 
@@ -1240,7 +1256,7 @@ function mfpc_get_memcached_connection( $servers, $debug = false ) {
 
     $servers_to_add = [];
     if ( empty( $servers ) ) {
-         if ($debug) error_log("MFPC Purge: No Memcached servers configured.");
+         if ($debug) mfpc_log("MFPC Purge: No Memcached servers configured.");
          return null;
     }
 
@@ -1255,29 +1271,29 @@ function mfpc_get_memcached_connection( $servers, $debug = false ) {
                 if (file_exists($host)) {
                     $servers_to_add[] = [$host, 0];
                 } else {
-                     if ($debug) error_log("MFPC Purge: Socket file not found: " . $host);
+                     if ($debug) mfpc_log("MFPC Purge: Socket file not found: " . $host);
                 }
             } elseif ($int_port > 0 && $int_port <= 65535) {
                 $servers_to_add[] = [$host, $int_port];
             } else {
-                 if ($debug) error_log("MFPC Purge: Invalid port for server: " . $host . ":" . $port);
+                 if ($debug) mfpc_log("MFPC Purge: Invalid port for server: " . $host . ":" . $port);
             }
         }
     }
 
     if (!empty($servers_to_add)) {
         if ($memcached->addServers($servers_to_add)) {
-             if ($debug) error_log("MFPC Purge: Added servers to Memcached connection (ID: {$persistent_id}): " . print_r($servers_to_add, true));
+             if ($debug) mfpc_log("MFPC Purge: Added servers to Memcached connection (ID: {$persistent_id}): " . mfpc_print_r($servers_to_add, true));
              // Optional: Verify connection after adding servers
              // $stats = $memcached->getStats();
              // if (empty($stats)) { /* Handle connection failure */ }
              return $memcached;
         } else {
-             if ($debug) error_log("MFPC Purge: Failed to add servers using addServers() (ID: {$persistent_id}).");
+             if ($debug) mfpc_log("MFPC Purge: Failed to add servers using addServers() (ID: {$persistent_id}).");
              return null; // Failed to add servers
         }
     } else {
-        if ($debug) error_log("MFPC Purge: No valid servers could be added to the connection (ID: {$persistent_id}).");
+        if ($debug) mfpc_log("MFPC Purge: No valid servers could be added to the connection (ID: {$persistent_id}).");
         return null; // No valid servers found
     }
 }
@@ -1300,7 +1316,7 @@ function mfpc_get_site_stats() {
 
     if ( $memcached ) {
         // Use the same prefix logic as index-cached.php
-        $host = $_SERVER['HTTP_HOST'] ?? parse_url( home_url(), PHP_URL_HOST );
+        $host = $_SERVER['HTTP_HOST'] ?? wp_parse_url( home_url(), PHP_URL_HOST );
         $prefix = "mfpc:stats:{$host}:";
 
         $stats['hits'] = (int) $memcached->get( $prefix . 'hits' );
@@ -1343,8 +1359,8 @@ function mfpc_perform_purge( $keys_to_purge, $options, $context = 'unknown' ) {
     $memcached = mfpc_get_memcached_connection( $options['servers'], $debug_mode );
 
     if ( ! $memcached ) {
-        set_transient('mfpc_purge_error', __( 'Could not connect to Memcached server(s) to purge cache.', 'mfpc-config' ), 60);
-        if ($debug_mode) error_log("MFPC Purge ({$context}): Failed to get Memcached connection.");
+        set_transient('mfpc_purge_error', __( 'Could not connect to Memcached server(s) to purge cache.', 'memblaze-fpc' ), 60);
+        if ($debug_mode) mfpc_log("MFPC Purge ({$context}): Failed to get Memcached connection.");
         return;
     }
 
@@ -1356,9 +1372,9 @@ function mfpc_perform_purge( $keys_to_purge, $options, $context = 'unknown' ) {
 
         if ($debug_mode) {
             $delete_msg = $deleted ? 'successfully purged' : ($res_code === Memcached::RES_NOTFOUND ? 'key not found' : 'failed to purge');
-            error_log("MFPC Purge ({$context}): Attempting Key '{$key}': {$delete_msg}.");
+            mfpc_log("MFPC Purge ({$context}): Attempting Key '{$key}': {$delete_msg}.");
             if (!$deleted && $res_code !== Memcached::RES_NOTFOUND) {
-                 error_log("MFPC Purge ({$context}): Memcached error deleting key '{$key}'. Code: " . $res_code . " (" . $memcached->getResultMessage() . ")");
+                 mfpc_log("MFPC Purge ({$context}): Memcached error deleting key '{$key}'. Code: " . $res_code . " (" . $memcached->getResultMessage() . ")");
             }
         }
     }
@@ -1379,7 +1395,7 @@ function mfpc_purge_all_cache() {
     if ( $memcached ) {
         $memcached->flush();
         if ( $options['debug'] ) {
-            error_log( "MFPC: All cache flushed via admin dashboard." );
+            mfpc_log( "MFPC: All cache flushed via admin dashboard." );
         }
     }
 }
@@ -1396,7 +1412,7 @@ function mfpc_get_purge_keys_for_post( $post_id_or_object, $debug_mode = false )
     $post = get_post($post_id_or_object);
 
     if (!$post) {
-        if ($debug_mode) error_log("MFPC Purge Keys: Could not get post object for ID/Object provided.");
+        if ($debug_mode) mfpc_log("MFPC Purge Keys: Could not get post object for ID/Object provided.");
         return $keys;
     }
 
@@ -1405,7 +1421,7 @@ function mfpc_get_purge_keys_for_post( $post_id_or_object, $debug_mode = false )
 
     // Helper to extract host, path, query safely from a URL string
     $get_url_parts = function($url) {
-        $parts = parse_url($url);
+        $parts = wp_parse_url($url);
         if (!$parts || !isset($parts['host'])) return false;
 
         $host = $parts['host'];
@@ -1541,7 +1557,7 @@ function mfpc_get_purge_keys_for_post( $post_id_or_object, $debug_mode = false )
     $keys = array_unique($keys);
 
     if ($debug_mode) {
-        error_log("MFPC Purge Keys: Generated keys: " . implode(', ', $keys));
+        mfpc_log("MFPC Purge Keys: Generated keys: " . implode(', ', $keys));
     }
 
     return $keys;
@@ -1816,7 +1832,7 @@ function mfpc_execute_pre_cache() {
         $urls = mfpc_get_recent_urls( $count );
         mfpc_preload_urls( $urls );
         if ( ! empty( $options['debug'] ) ) {
-            error_log( "MFPC Pre-cache: Triggered for {$count} items." );
+            mfpc_log( "MFPC Pre-cache: Triggered for {$count} items." );
         }
     }
 }
@@ -1828,7 +1844,7 @@ function mfpc_execute_pre_cache() {
  * Register "Purge Cache" bulk action.
  */
 function mfpc_register_bulk_action( $bulk_actions ) {
-    $bulk_actions['mfpc_purge'] = __( 'Purge Cache', 'mfpc-config' );
+    $bulk_actions['mfpc_purge'] = __( 'Purge Cache', 'memblaze-fpc' );
     return $bulk_actions;
 }
 add_filter( 'bulk_actions-edit-post', __NAMESPACE__ . '\mfpc_register_bulk_action' );
@@ -1871,7 +1887,7 @@ function mfpc_bulk_admin_notices() {
     if ( ! empty( $_REQUEST['mfpc_bulk_purged'] ) ) {
         $count = intval( $_REQUEST['mfpc_bulk_purged'] );
         printf( '<div id="message" class="updated notice is-dismissible"><p>' .
-            _n( '%s post cache purged.', '%s posts cache purged.', $count, 'mfpc-config' ) .
+            _n( '%s post cache purged.', '%s posts cache purged.', $count, 'memblaze-fpc' ) .
             '</p></div>', $count );
     }
 }
@@ -1890,7 +1906,7 @@ function mfpc_add_row_action( $actions, $post ) {
         'mfpc_purge_post_' . $post->ID
     );
 
-    $actions['mfpc_purge'] = '<a href="' . esc_url( $url ) . '">' . __( 'Purge', 'mfpc-config' ) . '</a>';
+    $actions['mfpc_purge'] = '<a href="' . esc_url( $url ) . '">' . __( 'Purge', 'memblaze-fpc' ) . '</a>';
     return $actions;
 }
 add_filter( 'post_row_actions', __NAMESPACE__ . '\mfpc_add_row_action', 10, 2 );
@@ -1904,7 +1920,7 @@ function mfpc_handle_row_action_purge() {
     check_admin_referer( 'mfpc_purge_post_' . $post_id );
 
     if ( ! current_user_can( 'edit_post', $post_id ) ) {
-        wp_die( __( 'You do not have permission to purge this post.', 'mfpc-config' ) );
+        wp_die( __( 'You do not have permission to purge this post.', 'memblaze-fpc' ) );
     }
 
     $options = mfpc_get_options();
@@ -1933,7 +1949,7 @@ function mfpc_handle_purge_current_page() {
     check_admin_referer( 'mfpc_purge_current_page_' . $post_id );
 
     if ( ! current_user_can( 'edit_post', $post_id ) ) {
-        wp_die( __( 'You do not have permission to purge this post.', 'mfpc-config' ) );
+        wp_die( __( 'You do not have permission to purge this post.', 'memblaze-fpc' ) );
     }
 
     $options = mfpc_get_options();
@@ -1961,26 +1977,26 @@ function mfpc_uninstall() {
 
     // Attempt to delete config files
     if ( file_exists( MFPC_PHP_CONFIG_FILE_PATH ) ) {
-        // Check write permissions before attempting unlink
+        // Check write permissions before attempting wp_delete_file
         if ( is_writable( MFPC_PHP_CONFIG_FILE_PATH ) ) {
-            @unlink( MFPC_PHP_CONFIG_FILE_PATH );
+            @wp_delete_file( MFPC_PHP_CONFIG_FILE_PATH );
         } else {
             // Optionally log an error if permissions prevent deletion
-            error_log("MFPC Uninstall: Could not delete PHP config file due to permissions: " . MFPC_PHP_CONFIG_FILE_PATH);
+            mfpc_log("MFPC Uninstall: Could not delete PHP config file due to permissions: " . MFPC_PHP_CONFIG_FILE_PATH);
         }
     }
     if ( file_exists( MFPC_NGINX_OUTPUT_FILE_PATH ) ) {
          if ( is_writable( MFPC_NGINX_OUTPUT_FILE_PATH ) ) {
-            @unlink( MFPC_NGINX_OUTPUT_FILE_PATH );
+            @wp_delete_file( MFPC_NGINX_OUTPUT_FILE_PATH );
         } else {
-             error_log("MFPC Uninstall: Could not delete Nginx config file due to permissions: " . MFPC_NGINX_OUTPUT_FILE_PATH);
+             mfpc_log("MFPC Uninstall: Could not delete Nginx config file due to permissions: " . MFPC_NGINX_OUTPUT_FILE_PATH);
         }
     }
     if ( file_exists( MFPC_NGINX_UPSTREAM_FILE_PATH ) ) {
          if ( is_writable( MFPC_NGINX_UPSTREAM_FILE_PATH ) ) {
-            @unlink( MFPC_NGINX_UPSTREAM_FILE_PATH );
+            @wp_delete_file( MFPC_NGINX_UPSTREAM_FILE_PATH );
         } else {
-             error_log("MFPC Uninstall: Could not delete Nginx upstream config file due to permissions: " . MFPC_NGINX_UPSTREAM_FILE_PATH);
+             mfpc_log("MFPC Uninstall: Could not delete Nginx upstream config file due to permissions: " . MFPC_NGINX_UPSTREAM_FILE_PATH);
         }
     }
 

@@ -2,7 +2,7 @@
 Contributors: erwinlomibao
 Tags: cache, memcached, performance, full page cache, optimization
 Requires at least: 5.0
-Tested up to: 6.4
+Tested up to: 6.7
 Stable tag: 1.6.0
 Requires PHP: 7.4
 License: GPLv2 or later
@@ -14,8 +14,8 @@ Robust full-page caching mechanism for WordPress sites using Memcached, signific
 
 This system provides a robust full-page caching mechanism for WordPress sites using Memcached, significantly improving performance and reducing server load. It consists of two main components:
 
-1. **`memblaze-fullpage-cache-config.php`**: A WordPress plugin that provides an admin interface to configure the caching behavior, Memcached server(s), cache expiration rules, and generates necessary configuration files.
-2. **`index-cached.php`**: A PHP front-controller script that sits in your WordPress root directory. It intercepts requests, attempts to serve pages from Memcached, or, if a page isn't cached or the cache is bypassed, it loads WordPress to generate the page and then stores it in Memcached for subsequent requests.
+1. **Plugin Config**: A WordPress plugin that provides an admin interface to configure the caching behavior, Memcached server(s), cache expiration rules, and generates necessary configuration files.
+2. **index-cached.php**: A PHP front-controller script that sits in your WordPress root directory. It intercepts requests, attempts to serve pages from Memcached, or, if a page isn't cached or the cache is bypassed, it loads WordPress to generate the page and then stores it in Memcached for subsequent requests.
 
 = Features =
 
@@ -31,7 +31,7 @@ This system provides a robust full-page caching mechanism for WordPress sites us
 
 == Installation ==
 
-1. Upload the `wp-mfpc` folder to the `/wp-content/plugins/` directory.
+1. Upload the `memblaze-fpc` folder to the `/wp-content/plugins/` directory.
 2. Activate the plugin through the 'Plugins' menu in WordPress.
 3. Copy `index-cached.php` from the plugin directory to your WordPress root directory (where `wp-config.php` is located).
 4. Configure your Memcached servers and settings in the 'MemBlaze Cache' menu.
@@ -54,6 +54,7 @@ Yes, this plugin requires the `memcached` extension to be installed on your serv
 = 1.6.0 =
 * Added Asset Minification (HTML, CSS, JS).
 * Updated UI and documentation.
+* Improved security and compliance with WordPress standards.
 
 = 1.5.5 =
 * Updated CLI commands for multiple ID purging and warming.

@@ -309,7 +309,7 @@ class CLI extends WP_CLI_Command {
             $status_msg = "Fetched";
             // Verify if cached
             if ( $memcached ) {
-                $parts = parse_url( $url );
+                $parts = wp_parse_url( $url );
                 $host = $parts['host'];
                 if ( isset( $parts['port'] ) && ! in_array( $parts['port'], [ 80, 443 ] ) ) {
                     $host .= ':' . $parts['port'];

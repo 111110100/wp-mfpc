@@ -62,7 +62,7 @@ This system provides a robust full-page caching mechanism for WordPress sites us
 ### Step 1: Install Files
 
 1.  **Plugin (`memblaze-fullpage-cache-config.php`)**:
-    *   Place the entire `wp-mfpc` directory into your WordPress `wp-content/plugins/` directory (or create a directory named `memblaze-fullpage-cache-config` and place all plugin files there).
+    *   Place the entire `memblaze-fpc` directory into your WordPress `wp-content/plugins/` directory (or create a directory named `memblaze-fullpage-cache-config` and place all plugin files there).
     *   Activate the "Memcached Full Page Cache" plugin from the WordPress admin area.
 
 2.  **Front Controller (`index-cached.php`)**:
