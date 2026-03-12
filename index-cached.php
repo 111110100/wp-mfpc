@@ -2,9 +2,9 @@
 /**
  * @package index-cached.php
  * @author erwin lomibao/Gemini Code Assist
- * @version 1.7.0
+ * @version 1.7.1
  * @license GPLv2
- * @website https://github.com/111110100/memblaze-fpc
+ * @website https://github.com/111110100/memblaze-full-page-cache
  */
 
 // Prevent direct access if not via expected front-controller entry

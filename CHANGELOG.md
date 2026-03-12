@@ -2,9 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.7.1] - 2026-03-12
+### Changed
+- **File Renaming**: Renamed main plugin file from `memblaze-fpc.php` to `memblaze-full-page-cache.php`.
+
 ## [1.7.0] - 2026-03-12
 ### Added
 - **Plugin Check Compliance**: Comprehensive audit and fixes to align with WordPress.org Plugin Check standards.
+- **Text Domain Update**: Updated text domain from `memblaze-fpc` to `memblaze-full-page-cache` for better clarity and compliance.
 
 ### Fixed
 - **Security**: 

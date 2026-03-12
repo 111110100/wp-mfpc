@@ -3,7 +3,7 @@ Contributors: erwinlomibao
 Tags: cache, memcached, performance, full page cache, optimization
 Requires at least: 5.0
 Tested up to: 6.9
-Stable tag: 1.7.0
+Stable tag: 1.7.1
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -31,7 +31,7 @@ This system provides a robust full-page caching mechanism for WordPress sites us
 
 == Installation ==
 
-1. Upload the `memblaze-fpc` folder to the `/wp-content/plugins/` directory.
+1. Upload the `memblaze-full-page-cache` folder to the `/wp-content/plugins/` directory.
 2. Activate the plugin through the 'Plugins' menu in WordPress.
 3. Copy `index-cached.php` from the plugin directory to your WordPress root directory (where `wp-config.php` is located).
 4. Configure your Memcached servers and settings in the 'MemBlaze Cache' menu.
