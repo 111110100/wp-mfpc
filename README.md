@@ -4,7 +4,7 @@
 
 This system provides a robust full-page caching mechanism for WordPress sites using Memcached, significantly improving performance and reducing server load. It consists of two main components:
 
-1.  **`memblaze-full-page-cache-config.php`**: A WordPress plugin that provides an admin interface to configure the caching behavior, Memcached server(s), cache expiration rules, and generates necessary configuration files.
+1.  **`memblaze-full-page-cache.php`**: A WordPress plugin that provides an admin interface to configure the caching behavior, Memcached server(s), cache expiration rules, and generates necessary configuration files.
 2.  **`index-cached.php`**: A PHP front-controller script that sits in your WordPress root directory. It intercepts requests, attempts to serve pages from Memcached, or, if a page isn't cached or the cache is bypassed, it loads WordPress to generate the page and then stores it in Memcached for subsequent requests.
 
 ## Features
@@ -62,7 +62,7 @@ This system provides a robust full-page caching mechanism for WordPress sites us
 ### Step 1: Install Files
 
 1.  **Plugin (`memblaze-fullpage-cache-config.php`)**:
-    *   Place the entire `memblaze-fpc` directory into your WordPress `wp-content/plugins/` directory (or create a directory named `memblaze-fullpage-cache-config` and place all plugin files there).
+    *   Place the entire `memblaze-full-page-cache` directory into your WordPress `wp-content/plugins/` directory (or create a directory named `memblaze-fullpage-cache-config` and place all plugin files there).
     *   Activate the "Memcached Full Page Cache" plugin from the WordPress admin area.
 
 2.  **Front Controller (`index-cached.php`)**:
