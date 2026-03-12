@@ -444,7 +444,7 @@ function mfpc_options_page_html() {
                             <code>nginx -t && nginx -s reload</code>
                         <?php if ( !file_exists( ABSPATH . 'index-cached.php' ) ) : ?>
                             <p><?php esc_html_e( 'To use the full page cache, you need to copy index-cached.php to your WordPress root directory.', 'mfpc-config' ); ?></p>
-                            <code>sudo cp <?php echo ABSPATH . 'wp-content/plugins/wp-mfpc/index-cached.php'?> <?php echo ABSPATH ?></code>
+                            <code>sudo cp <?php echo esc_html( ABSPATH . 'wp-content/plugins/wp-mfpc/index-cached.php' ) ?> <?php echo esc_html( ABSPATH ) ?></code>
                         <?php endif; ?>
                         <?php delete_transient('mfpc_nginx_config_success'); ?>
                     <?php endif; ?>
@@ -872,7 +872,7 @@ function mfpc_content_type_rules_section_html() {
                     }
                 }
             });
-            var optionName = '<?php echo MFPC_OPTION_NAME; ?>';
+            var optionName = '<?php echo esc_js( MFPC_OPTION_NAME ); ?>';
             var rowHtml = '<tr class="mfpc-content-type-rule-row">' +
                 '<td><input type="text" name="' + optionName + '[content_type_rules][' + index + '][path]" value="" class="regular-text" required /></td>' +
                 '<td><select name="' + optionName + '[content_type_rules][' + index + '][content_type]">' +
@@ -1118,7 +1118,7 @@ function mfpc_enqueue_admin_scripts( $hook_suffix ) {
         return;
     }
 
-    wp_enqueue_script( 'mfpc-admin-script', plugin_dir_url( __FILE__ ) . 'admin-script.js', array( 'jquery' ), '1.5.1', true ); // Increment version
+    wp_enqueue_script( 'mfpc-admin-script', plugin_dir_url( __FILE__ ) . 'admin-script.js', array( 'jquery' ), MFPC_VERSION, true ); // Use MFPC_VERSION
 
     $script_data = array(
         'optionName' => MFPC_OPTION_NAME,

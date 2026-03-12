@@ -1,185 +1,66 @@
-# MemBlaze Full Page Cache for WordPress
+=== MemBlaze Full Page Cache ===
+Contributors: erwinlomibao
+Tags: cache, memcached, performance, full page cache, optimization
+Requires at least: 5.0
+Tested up to: 6.4
+Stable tag: 1.6.0
+Requires PHP: 7.4
+License: GPLv2 or later
+License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-## Introduction
+Robust full-page caching mechanism for WordPress sites using Memcached, significantly improving performance and reducing server load.
+
+== Description ==
 
 This system provides a robust full-page caching mechanism for WordPress sites using Memcached, significantly improving performance and reducing server load. It consists of two main components:
 
-1.  **`memblaze-fullpage-cache-config.php`**: A WordPress plugin that provides an admin interface to configure the caching behavior, Memcached server(s), cache expiration rules, and generates necessary configuration files.
-2.  **`index-cached.php`**: A PHP front-controller script that sits in your WordPress root directory. It intercepts requests, attempts to serve pages from Memcached, or, if a page isn't cached or the cache is bypassed, it loads WordPress to generate the page and then stores it in Memcached for subsequent requests.
+1. **`memblaze-fullpage-cache-config.php`**: A WordPress plugin that provides an admin interface to configure the caching behavior, Memcached server(s), cache expiration rules, and generates necessary configuration files.
+2. **`index-cached.php`**: A PHP front-controller script that sits in your WordPress root directory. It intercepts requests, attempts to serve pages from Memcached, or, if a page isn't cached or the cache is bypassed, it loads WordPress to generate the page and then stores it in Memcached for subsequent requests.
 
-## Features
+= Features =
 
-*   **Memcached Integration**: Leverages the speed and efficiency of Memcached for storing full HTML pages.
-*   **Configurable Cache Times**: Set a default cache expiration time and define specific cache durations for different URL paths (e.g., `/blog/`, `/category/`).
-*   **Multiple Server Support**: Configure one or more Memcached servers (TCP/IP or Unix sockets).
-*   **Automatic Cache Purging**:
-    *   Purges cache for individual posts/pages and the homepage when content is saved, updated, or deleted.
-    *   **Bulk Actions**: Purge cache for multiple posts directly from the WordPress post list.
-    *   **Purge Method**: Choose between precise purging of specific pages or flushing the entire cache on updates.
-*   **Cache Pre-loading (Warmup)**:
-    *   **On Save**: Automatically visits the post and homepage after purging to regenerate the cache.
-    *   **Scheduled**: Automatically pre-cache a specified number of recent posts hourly.
-    *   **WP-CLI**: Command to manually warm up the cache.
-*   **Asset Minification**: Automatically minifies HTML, inline CSS, and inline JS to reduce page size and improve Core Web Vitals.
-*   **Lazy Load (Experimental)**: Automatically adds `loading="lazy"` attributes to images and iframes to improve Core Web Vitals.
-*   **Cookie-Based Cache Bypass**: Define a list of cookie name prefixes. If a visitor has any of these cookies, the cache will be bypassed for them, ensuring dynamic content for logged-in users or users with specific session cookies (e.g., e-commerce carts).
-*   **Admin Interface & Stats**:
-    *   **Dashboard Stats**: View cache hit/miss ratios and server statistics.
-    *   **Admin Bar**: See cache status of the current page and purge it instantly.
-*   **Debug Mode**: Optional debug comments in the HTML output showing cache status and generation time.
-*   **Nginx Configuration Generation**: The plugin generates a sample Nginx configuration snippet to help direct requests to `index-cached.php`.
-*   **Server Status Check**: Test connectivity to your Memcached servers directly from the plugin settings page.
-*   **Enterprise Ready**:
-    *   **Environment Configuration**: Support for defining settings via `wp-config.php` constants for immutable deployments.
-    *   **WP-CLI Support**: Manage cache and check status via command line.
-    *   **Site Health Integration**: Built-in checks for Memcached connectivity.
-    *   **Emergency Bypass**: Instantly disable caching via a file trigger.
+* **Memcached Integration**: Leverages the speed and efficiency of Memcached for storing full HTML pages.
+* **Configurable Cache Times**: Set a default cache expiration time and define specific cache durations for different URL paths.
+* **Multiple Server Support**: Configure one or more Memcached servers (TCP/IP or Unix sockets).
+* **Automatic Cache Purging**: Purges cache for individual posts/pages and the homepage when content is saved, updated, or deleted.
+* **Asset Minification**: Automatically minifies HTML, inline CSS, and inline JS to reduce page size and improve Core Web Vitals.
+* **Lazy Load (Experimental)**: Automatically adds `loading="lazy"` attributes to images and iframes.
+* **Cookie-Based Cache Bypass**: Define a list of cookie name prefixes (e.g., for logged-in users).
+* **WP-CLI Support**: Manage cache and check status via command line.
+* **Site Health Integration**: Built-in checks for Memcached connectivity.
 
-## How it Works
+== Installation ==
 
-1.  **Nginx Request Handling**: The web server (Nginx) is configured to first check for static files. If a static file is not found and the request is for a PHP page, Nginx is configured to pass the request to `index-cached.php` instead of the standard `index.php`.
-2.  **`index-cached.php` Interception**:
-    *   Reads its configuration from `wp-content/memcached-fp-config.php` (generated by the plugin).
-    *   Checks if the current visitor has any cookies that match the "bypass cookies" list. If so, it proceeds to generate a fresh page without checking or storing to cache.
-    *   Determines the appropriate cache key based on the host and request URI.
-    *   Determines the cache expiration time based on configured rules or the default.
-    *   Attempts to fetch the page from Memcached using the cache key.
-3.  **Cache Hit**: If the page is found in Memcached and is not expired, `index-cached.php` serves the cached HTML directly to the visitor and exits.
-4.  **Cache Miss/Bypass**: If the page is not in Memcached, is expired, or the cache is bypassed:
-    *   `index-cached.php` captures the output of WordPress generating the page.
-    *   If caching is enabled for this request and not bypassed by a cookie, the generated HTML is stored in Memcached with the determined cache key and expiration time.
-    *   The freshly generated HTML is served to the visitor.
+1. Upload the `wp-mfpc` folder to the `/wp-content/plugins/` directory.
+2. Activate the plugin through the 'Plugins' menu in WordPress.
+3. Copy `index-cached.php` from the plugin directory to your WordPress root directory (where `wp-config.php` is located).
+4. Configure your Memcached servers and settings in the 'MemBlaze Cache' menu.
+5. (Recommended) Configure your Nginx server to use the generated configuration.
 
-## Setup and Installation
+== Frequently Asked Questions ==
 
-### Prerequisites
+= Does this require Nginx? =
+It is highly recommended and optimized for Nginx, but it can work on Apache if you set `index-cached.php` as the default index.
 
-*   A WordPress installation.
-*   Memcached server(s) installed and running.
-*   The Memcached PECL extension for PHP installed and enabled.
-*   Nginx web server (recommended, as the system is primarily designed for it).
+= Do I need the Memcached PECL extension? =
+Yes, this plugin requires the `memcached` extension to be installed on your server.
 
-### Step 1: Install Files
+== Screenshots ==
 
-1.  **Plugin (`memblaze-fullpage-cache-config.php`)**:
-    *   Place the entire `wp-mfpc` directory into your WordPress `wp-content/plugins/` directory (or create a directory named `memblaze-fullpage-cache-config` and place all plugin files there).
-    *   Activate the "Memcached Full Page Cache" plugin from the WordPress admin area.
+1. Main configuration dashboard showing settings and stats.
 
-2.  **Front Controller (`index-cached.php`)**:
-    *   Place the `index-cached.php` file into the root directory of your WordPress installation (the same directory where `wp-config.php` and the main `index.php` are located).
+== Changelog ==
 
-### Step 2: Configure Nginx
+= 1.6.0 =
+* Added Asset Minification (HTML, CSS, JS).
+* Updated UI and documentation.
 
-You need to modify your Nginx configuration to direct appropriate requests to `index-cached.php`.
+= 1.5.5 =
+* Updated CLI commands for multiple ID purging and warming.
 
-1.  **Generate Nginx Config**:
-    *   Go to "MemBlaze Cache" in your WordPress admin menu.
-    *   Configure your Memcached server(s) under the "Memcached Servers" section.
-    *   Save the settings.
-    *   The plugin will generate two files in your `wp-content/` directory:
-        *   `memcached_upstream.conf`: Contains the `upstream memcached_servers { ... }` block.
-        *   `memcached_nginx.conf`: Contains the location rules and logic for serving from Memcached.
+= 1.4.0 =
+* Added WP-CLI support and Site Health integration.
+* Added emergency bypass file support.
 
-2.  **Apply Nginx Configuration**:
-    *   **Include the Upstream Config**:
-        Copy `wp-content/memcached_upstream.conf` to `/etc/nginx/conf.d/` or include it in your main `nginx.conf` within the `http { ... }` block.
-    *   **Modify your site's server block**:
-        Include the generated `memcached_nginx.conf` in your `server` block:
-
-        ```nginx
-        server {
-            listen 80;
-            server_name example.com;
-            root /var/www/html; # Your WordPress root
-
-            # Include the MemBlaze location rules
-            include /var/www/path/to/wordpress/wp-content/memcached_nginx.conf;
-
-            # ... other rules (static assets, security)
-        }
-        ```
-
-3.  **Test Nginx Configuration**:
-    `sudo nginx -t`
-
-4.  **Reload Nginx**:
-    `sudo systemctl reload nginx`
-
-### Step 3: Configure the Plugin
-
-1.  Navigate to "MemBlaze Cache" -> "Config" in your WordPress admin dashboard.
-2.  **General Settings**:
-    *   **Enable Debug**: Check this to add HTML comments showing cache status and generation time.
-    *   **Default Cache Time**: Set the default expiration time in seconds (e.g., `3600` for 1 hour).
-    *   **Purge Cache on Actions**: Automatically clear relevant caches when posts/pages are saved, updated, or deleted.
-    *   **Pre-load Cache**: Automatically visit the post and homepage after purging.
-    *   **Pre-cache Recent Posts**: Number of recent items to warm up hourly.
-    *   **Minify Assets**: Automatically minifies HTML, inline CSS, and inline JS to reduce page size and improve Core Web Vitals.
-    *   **Lazy Load**: Enable experimental native lazy loading for images/iframes.
-    *   **Purge Method**: Select "Purge Specific Pages" (default) or "Flush Entire Cache".
-    *   **Bypass Cache for Cookies**: Add cookie name prefixes to bypass the cache (e.g., `wordpress_logged_in_`).
-3.  **Memcached Servers**:
-    *   Add your Memcached server(s) (Host and Port).
-    *   Check the "Status" column for connectivity.
-4.  **Cache Time Rules**:
-    *   Define specific durations for URL paths (e.g., `/blog/`).
-5.  **Content Type Rules**:
-    *   Define specific Content-Types for URI paths (e.g., `/feed` as `application/rss+xml`).
-6.  **Save Settings**: Click "Save Settings". This updates the configuration files in `wp-content/`.
-
-### Step 4: Enterprise Configuration (Optional)
-
-Configure via `wp-config.php` to override database settings:
-
-```php
-define( 'WP_MFPC_DEBUG', true );
-define( 'WP_MFPC_DEFAULT_CACHE_TIME', 3600 );
-define( 'WP_MFPC_SERVERS', [
-    [ 'host' => '127.0.0.1', 'port' => '11211' ],
-] );
-define( 'WP_MFPC_RULES', [
-    [ 'path' => '/', 'time' => 600 ],
-] );
-define( 'WP_MFPC_BYPASS_COOKIES', [
-    'wordpress_logged_in_',
-    'woocommerce_items_in_cart',
-] );
-```
-
-### Step 5: WP-CLI Usage
-
-*   `wp mfpc flush <all|posts|pages> [<ids>]`: Flush cache items (comma-separated IDs for posts/pages).
-*   `wp mfpc status`: Check server connectivity.
-*   `wp mfpc warmup [<count>]`: Pre-cache recent items.
-*   `wp mfpc warmup <all|posts|pages> [<ids>]`: Pre-cache specific items (comma-separated IDs for posts/pages).
-*   `wp mfpc generate-nginx`: Regenerate configuration files.
-*   `wp mfpc help`: Display available commands.
-
-### Step 6: Emergency Bypass
-
-Create `.mfpc-bypass` in your WordPress root to disable caching instantly:
-
-```bash
-touch .mfpc-bypass
-```
-
-### Step 7: Test
-
-1.  Visit your site in incognito mode.
-2.  Check page source for `<!-- Page generated (cache miss) ... -->`.
-3.  Refresh and look for `<!-- Page retrieved from cache ... -->` or `<!--Page retrieved (cache hit) from nginx/memcached-->`.
-
-## Troubleshooting
-
-*   **Permissions**: Ensure your web server has write permissions to the `wp-content/` directory to create `memcached-fp-config.php` and `memcached_nginx.conf`.
-*   **Memcached PECL Extension**: Verify the Memcached PHP extension is installed and enabled (`php -m | grep memcached`).
-*   **Memcached Server Running**: Ensure your Memcached service is running.
-*   **Nginx Configuration**: Double-check your Nginx configuration.
-*   **Plugin Conflicts**: Other caching plugins might interfere.
-*   **Debug Output**: Use the plugin's debug mode and check logs.
-
-## Professional Services
-
-Need help with installation, configuration, or customization? Contact me for professional services at elomibao@gmail.com.
-
----
+= 1.3.0 =
+* Initial release.
