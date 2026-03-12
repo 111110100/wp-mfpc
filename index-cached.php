@@ -2,7 +2,7 @@
 /**
  * @package index-cached.php
  * @author erwin lomibao/Gemini Code Assist
- * @version 1.6.0
+ * @version 1.7.0
  * @license GPLv2
  * @website https://github.com/111110100/memblaze-fpc
  */
@@ -38,7 +38,9 @@ if (file_exists(__DIR__ . '/.mfpc-bypass')) {
 $mfpc_debug = ( defined( 'WP_DEBUG' ) && WP_DEBUG ) || ( isset( $mfpc_config['debug'] ) ? (bool) $mfpc_config['debug'] : false );
 
 if ( $mfpc_debug ) {
+    // phpcs:ignore Squiz.PHP.DiscouragedFunctions.Discouraged
     ini_set('display_errors', 1);
+    // phpcs:ignore WordPress.PHP.DevelopmentFunctions.prevent_path_disclosure_error_reporting
     error_reporting(E_ALL);
     echo "<!-- MFPC DEBUG: Script Start. Config Loaded. Servers: " . (isset($mfpc_config['servers']) ? (int) count($mfpc_config['servers']) : '0') . " -->\n";
 }
@@ -131,11 +133,13 @@ $mfpc_http_host = filter_var( wp_unslash( $_SERVER['HTTP_HOST'] ), FILTER_SANITI
  * Placeholder for wp_unslash if WP is not loaded.
  */
 if ( ! function_exists( 'wp_unslash' ) ) {
+    // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedFunctionFound
     function wp_unslash( $data ) {
         return stripslashes_deep( $data );
     }
 }
 if ( ! function_exists( 'stripslashes_deep' ) ) {
+    // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedFunctionFound
     function stripslashes_deep( $value ) {
         if ( is_array( $value ) ) {
             $value = array_map( 'stripslashes_deep', $value );
@@ -244,6 +248,7 @@ if ($mfpc_cache_bypassed_by_cookie) {
     $mfpc_debugMessage = 'Page generated (' . $mfpc_bypass_reason . ') in %f seconds.';
 } elseif ( $mfpc_memcached && $mfpc_cacheTime > 0 ) {
     if ( $mfpc_debug ) {
+        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
         echo "<!-- MFPC DEBUG: Cache Key: " . htmlspecialchars($mfpc_cacheKey) . " -->\n";
     }
     $mfpc_cached_item_raw = $mfpc_memcached->get( $mfpc_cacheKey );
@@ -267,6 +272,7 @@ if ($mfpc_cache_bypassed_by_cookie) {
             $mfpc_cache_age = ($mfpc_generated_at > 0) ? (time() - $mfpc_generated_at) : 0;
 
             if ($mfpc_probabilistic_beta > 0 && $mfpc_generated_at > 0) {
+                // phpcs:ignore WordPress.WP.AlternativeFunctions.rand_mt_rand
                 $mfpc_random_float = function_exists('wp_rand') ? wp_rand() / 2147483647 : mt_rand() / mt_getrandmax();
                 if ($mfpc_random_float > 0 && (time() - $mfpc_generated_at) <= ($mfpc_cacheTime - ($mfpc_probabilistic_beta * -log($mfpc_random_float)))) {
                     $mfpc_debugMessage = 'Page retrieved from cache in %f seconds.';
@@ -297,6 +303,7 @@ if ( $mfpc_html === false ) {
     $mfpc_wp_blog_header = __DIR__ . '/wp-blog-header.php';
 
     if (file_exists($mfpc_wp_blog_header)) {
+        // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound
         define( 'WP_USE_THEMES', true );
         $_SERVER['SCRIPT_FILENAME'] = __DIR__ . '/index.php';
         require $mfpc_wp_blog_header; 
@@ -362,6 +369,7 @@ if ($mfpc_memcached) {
 $mfpc_finish = microtime( true );
 $mfpc_duration = $mfpc_finish - $mfpc_start;
 
+// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 echo (string) $mfpc_html;
 
 if ( $mfpc_debug && strpos( $mfpc_contentType, 'text/html' ) !== false ) {
@@ -375,6 +383,7 @@ if ( $mfpc_debug && strpos( $mfpc_contentType, 'text/html' ) !== false ) {
         $mfpc_dbg_out .= ' | Age: ' . (int) $mfpc_cache_age . 's';
     }
     $mfpc_dbg_out .= ' -->';
+    // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
     echo (string) $mfpc_dbg_out;
 }
 

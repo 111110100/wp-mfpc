@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       MemBlaze Full Page Cache
  * Description:       Provides an admin interface to configure Memcached servers and cache rules for index-cached.php. Also allows purging cache on post save and generates Nginx upstream config.
- * Version:           1.6.0
+ * Version:           1.7.0
  * Author:            Erwin Lomibao/Gemini Code Assist
  * Author URI:        https://erwinlomibao.com/memblaze
  * License:           GPL-2.0-or-later
@@ -15,7 +15,7 @@ namespace MFPC;
 defined( 'ABSPATH' ) || exit; // Exit if accessed directly
 
 // --- Constants ---
-define( 'MFPC_VERSION', '1.6.0' );
+define( 'MFPC_VERSION', '1.7.0' );
 define( 'MFPC_OPTION_NAME', 'mfpc_settings' );
 define( 'MFPC_PHP_CONFIG_FILE_PATH', WP_CONTENT_DIR . '/memcached-fp-config.php' );
 define( 'MFPC_NGINX_TEMPLATE_FILE_PATH', plugin_dir_path( __FILE__ ) . 'nginx-template.conf' );
@@ -90,8 +90,8 @@ function mfpc_add_admin_menu_bar( $admin_bar ) {
         $options = mfpc_get_options();
         $memcached = mfpc_get_memcached_connection( $options['servers'] );
         if ( $memcached ) {
-            $host = $_SERVER['HTTP_HOST'] ?? wp_parse_url( home_url(), PHP_URL_HOST );
-            $uri = $_SERVER['REQUEST_URI'];
+            $host = isset( $_SERVER['HTTP_HOST'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_HOST'] ) ) : wp_parse_url( home_url(), PHP_URL_HOST );
+            $uri = isset( $_SERVER['REQUEST_URI'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '/';
 
             // Check cache status
             $cacheKey = "fullpage:{$host}{$uri}";
@@ -117,7 +117,8 @@ function mfpc_add_admin_menu_bar( $admin_bar ) {
                 }
             }
 
-            $status_text = $is_cached ? sprintf( __( 'Page: CACHED%s', 'memblaze-fpc' ), $age_suffix ) : __( 'Page: UNCACHED', 'memblaze-fpc' );
+            /* translators: %s: Age suffix string, e.g. ", (12s)" */
+            $status_text = $is_cached ? sprintf( __( 'Page: CACHED%s', 'memblaze-fpc' ), esc_html( $age_suffix ) ) : __( 'Page: UNCACHED', 'memblaze-fpc' );
 
             $admin_bar->add_menu([
                 'id' => 'mfpc-page-status',
@@ -396,7 +397,7 @@ function mfpc_options_page_html() {
     <div class="wrap">
         <h1><?php echo esc_html( get_admin_page_title() ); ?></h1>
         <?php
-        $server_software = isset($_SERVER['SERVER_SOFTWARE']) ? $_SERVER['SERVER_SOFTWARE'] : '';
+        $server_software = isset($_SERVER['SERVER_SOFTWARE']) ? sanitize_text_field( wp_unslash( $_SERVER['SERVER_SOFTWARE'] ) ) : '';
         $is_nginx = (stripos($server_software, 'nginx') !== false);
         $is_apache = (stripos($server_software, 'apache') !== false) || (stripos($server_software, 'litespeed') !== false);
 
@@ -566,7 +567,7 @@ function mfpc_reset_stats() {
     if ( $memcached ) {
         // Use the same prefix logic as index-cached.php
         // Note: index-cached.php uses $_SERVER['HTTP_HOST']. We assume admin is on same host.
-        $host = $_SERVER['HTTP_HOST'] ?? wp_parse_url( home_url(), PHP_URL_HOST );
+        $host = isset( $_SERVER['HTTP_HOST'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_HOST'] ) ) : wp_parse_url( home_url(), PHP_URL_HOST );
         $prefix = "mfpc:stats:{$host}:";
 
         $memcached->delete( $prefix . 'hits' );
@@ -707,8 +708,8 @@ function mfpc_servers_section_html() {
                     $status_info = mfpc_check_server_status( $server ); // Check status
                     ?>
                     <tr class="mfpc-server-row">
-                        <td><input type="text" name="<?php echo esc_attr(MFPC_OPTION_NAME); ?>[servers][<?php echo $index; ?>][host]" value="<?php echo esc_attr( $server['host'] ); ?>" class="regular-text" required /></td>
-                        <td><input type="text" name="<?php echo esc_attr(MFPC_OPTION_NAME); ?>[servers][<?php echo $index; ?>][port]" value="<?php echo esc_attr( $server['port'] ); ?>" class="small-text" required /></td>
+                        <td><input type="text" name="<?php echo esc_attr(MFPC_OPTION_NAME); ?>[servers][<?php echo esc_attr( $index ); ?>][host]" value="<?php echo esc_attr( $server['host'] ); ?>" class="regular-text" required /></td>
+                        <td><input type="text" name="<?php echo esc_attr(MFPC_OPTION_NAME); ?>[servers][<?php echo esc_attr( $index ); ?>][port]" value="<?php echo esc_attr( $server['port'] ); ?>" class="small-text" required /></td>
                         <td class="mfpc-server-status <?php echo esc_attr( $status_info['class'] ); ?>"><?php echo esc_html( $status_info['message'] ); ?></td> <?php // New Cell ?>
                         <td><button type="button" class="button mfpc-remove-row"><?php esc_html_e( 'Delete', 'memblaze-fpc' ); ?></button></td>
                     </tr>
@@ -769,8 +770,8 @@ function mfpc_rules_section_html() {
                 foreach ( $options['rules'] as $index => $rule ) :
                     ?>
                     <tr class="mfpc-rule-row">
-                        <td><input type="text" name="<?php echo esc_attr(MFPC_OPTION_NAME); ?>[rules][<?php echo $index; ?>][path]" value="<?php echo esc_attr( $rule['path'] ); ?>" class="regular-text" required /></td>
-                        <td><input type="number" min="0" step="1" name="<?php echo esc_attr(MFPC_OPTION_NAME); ?>[rules][<?php echo $index; ?>][time]" value="<?php echo esc_attr( $rule['time'] ); ?>" class="small-text mfpc-time-input" required /></td>
+                        <td><input type="text" name="<?php echo esc_attr(MFPC_OPTION_NAME); ?>[rules][<?php echo esc_attr( $index ); ?>][path]" value="<?php echo esc_attr( $rule['path'] ); ?>" class="regular-text" required /></td>
+                        <td><input type="number" min="0" step="1" name="<?php echo esc_attr(MFPC_OPTION_NAME); ?>[rules][<?php echo esc_attr( $index ); ?>][time]" value="<?php echo esc_attr( $rule['time'] ); ?>" class="small-text mfpc-time-input" required /></td>
                         <td class="mfpc-human-time"><?php echo esc_html( mfpc_seconds_to_human_time( $rule['time'] ) ); ?></td>
                         <td><button type="button" class="button mfpc-remove-row"><?php esc_html_e( 'Delete', 'memblaze-fpc' ); ?></button></td>
                     </tr>
@@ -840,9 +841,9 @@ function mfpc_content_type_rules_section_html() {
                 foreach ( $options['content_type_rules'] as $index => $rule ) :
                     ?>
                     <tr class="mfpc-content-type-rule-row">
-                        <td><input type="text" name="<?php echo esc_attr(MFPC_OPTION_NAME); ?>[content_type_rules][<?php echo $index; ?>][path]" value="<?php echo esc_attr( $rule['path'] ); ?>" class="regular-text" required /></td>
+                        <td><input type="text" name="<?php echo esc_attr(MFPC_OPTION_NAME); ?>[content_type_rules][<?php echo esc_attr( $index ); ?>][path]" value="<?php echo esc_attr( $rule['path'] ); ?>" class="regular-text" required /></td>
                         <td>
-                            <select name="<?php echo esc_attr(MFPC_OPTION_NAME); ?>[content_type_rules][<?php echo $index; ?>][content_type]">
+                            <select name="<?php echo esc_attr(MFPC_OPTION_NAME); ?>[content_type_rules][<?php echo esc_attr( $index ); ?>][content_type]">
                                 <?php foreach ( $content_types as $ct ) : ?>
                                     <option value="<?php echo esc_attr( $ct ); ?>" <?php selected( $rule['content_type'], $ct ); ?>><?php echo esc_html( $ct ); ?></option>
                                 <?php endforeach; ?>
@@ -1316,7 +1317,7 @@ function mfpc_get_site_stats() {
 
     if ( $memcached ) {
         // Use the same prefix logic as index-cached.php
-        $host = $_SERVER['HTTP_HOST'] ?? wp_parse_url( home_url(), PHP_URL_HOST );
+        $host = isset( $_SERVER['HTTP_HOST'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_HOST'] ) ) : wp_parse_url( home_url(), PHP_URL_HOST );
         $prefix = "mfpc:stats:{$host}:";
 
         $stats['hits'] = (int) $memcached->get( $prefix . 'hits' );
@@ -1483,7 +1484,7 @@ function mfpc_get_purge_keys_for_post( $post_id_or_object, $debug_mode = false )
     if ( $site_parts ) $target_hosts[] = $site_parts['host'];
 
     if ( isset( $_SERVER['HTTP_HOST'] ) ) {
-        $target_hosts[] = $_SERVER['HTTP_HOST'];
+        $target_hosts[] = sanitize_text_field( wp_unslash( $_SERVER['HTTP_HOST'] ) );
     }
 
     $target_hosts = array_unique( $target_hosts );
@@ -1884,11 +1885,15 @@ add_filter( 'handle_bulk_actions-edit-page', __NAMESPACE__ . '\mfpc_handle_bulk_
  * Display admin notice for bulk purge.
  */
 function mfpc_bulk_admin_notices() {
-    if ( ! empty( $_REQUEST['mfpc_bulk_purged'] ) ) {
-        $count = intval( $_REQUEST['mfpc_bulk_purged'] );
-        printf( '<div id="message" class="updated notice is-dismissible"><p>' .
-            _n( '%s post cache purged.', '%s posts cache purged.', $count, 'memblaze-fpc' ) .
-            '</p></div>', $count );
+    // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+    if ( ! empty( $_GET['mfpc_bulk_purged'] ) ) {
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+        $count = intval( $_GET['mfpc_bulk_purged'] );
+        /* translators: %s: Number of posts purged. */
+        $message = _n( '%s post cache purged.', '%s posts cache purged.', $count, 'memblaze-fpc' );
+        printf( '<div id="message" class="updated notice is-dismissible"><p>%s</p></div>',
+            esc_html( sprintf( $message, number_format_i18n( $count ) ) )
+        );
     }
 }
 add_action( 'admin_notices', __NAMESPACE__ . '\mfpc_bulk_admin_notices' );
@@ -1920,7 +1925,7 @@ function mfpc_handle_row_action_purge() {
     check_admin_referer( 'mfpc_purge_post_' . $post_id );
 
     if ( ! current_user_can( 'edit_post', $post_id ) ) {
-        wp_die( __( 'You do not have permission to purge this post.', 'memblaze-fpc' ) );
+        wp_die( esc_html__( 'You do not have permission to purge this post.', 'memblaze-fpc' ) );
     }
 
     $options = mfpc_get_options();
@@ -1936,7 +1941,7 @@ function mfpc_handle_row_action_purge() {
 
     $redirect_url = remove_query_arg( ['action', 'post_id', '_wpnonce'], wp_get_referer() );
     $redirect_url = add_query_arg( 'mfpc_bulk_purged', 1, $redirect_url );
-    wp_redirect( $redirect_url );
+    wp_safe_redirect( $redirect_url );
     exit;
 }
 add_action( 'admin_action_mfpc_purge_post', __NAMESPACE__ . '\mfpc_handle_row_action_purge' );
@@ -1949,7 +1954,7 @@ function mfpc_handle_purge_current_page() {
     check_admin_referer( 'mfpc_purge_current_page_' . $post_id );
 
     if ( ! current_user_can( 'edit_post', $post_id ) ) {
-        wp_die( __( 'You do not have permission to purge this post.', 'memblaze-fpc' ) );
+        wp_die( esc_html__( 'You do not have permission to purge this post.', 'memblaze-fpc' ) );
     }
 
     $options = mfpc_get_options();
@@ -1963,7 +1968,7 @@ function mfpc_handle_purge_current_page() {
         }
     }
 
-    wp_redirect( get_permalink( $post_id ) );
+    wp_safe_redirect( get_permalink( $post_id ) );
     exit;
 }
 add_action( 'admin_action_mfpc_purge_current_page', __NAMESPACE__ . '\mfpc_handle_purge_current_page' );
@@ -1975,26 +1980,31 @@ add_action( 'admin_action_mfpc_purge_current_page', __NAMESPACE__ . '\mfpc_handl
 function mfpc_uninstall() {
     delete_option( MFPC_OPTION_NAME );
 
+    // Initialize WP_Filesystem
+    require_once ABSPATH . 'wp-admin/includes/file.php';
+    WP_Filesystem();
+    global $wp_filesystem;
+
     // Attempt to delete config files
-    if ( file_exists( MFPC_PHP_CONFIG_FILE_PATH ) ) {
-        // Check write permissions before attempting wp_delete_file
-        if ( is_writable( MFPC_PHP_CONFIG_FILE_PATH ) ) {
-            @wp_delete_file( MFPC_PHP_CONFIG_FILE_PATH );
+    if ( $wp_filesystem->exists( MFPC_PHP_CONFIG_FILE_PATH ) ) {
+        // Check write permissions before attempting to delete
+        if ( $wp_filesystem->is_writable( MFPC_PHP_CONFIG_FILE_PATH ) ) {
+            $wp_filesystem->delete( MFPC_PHP_CONFIG_FILE_PATH );
         } else {
             // Optionally log an error if permissions prevent deletion
             mfpc_log("MFPC Uninstall: Could not delete PHP config file due to permissions: " . MFPC_PHP_CONFIG_FILE_PATH);
         }
     }
-    if ( file_exists( MFPC_NGINX_OUTPUT_FILE_PATH ) ) {
-         if ( is_writable( MFPC_NGINX_OUTPUT_FILE_PATH ) ) {
-            @wp_delete_file( MFPC_NGINX_OUTPUT_FILE_PATH );
+    if ( $wp_filesystem->exists( MFPC_NGINX_OUTPUT_FILE_PATH ) ) {
+         if ( $wp_filesystem->is_writable( MFPC_NGINX_OUTPUT_FILE_PATH ) ) {
+            $wp_filesystem->delete( MFPC_NGINX_OUTPUT_FILE_PATH );
         } else {
              mfpc_log("MFPC Uninstall: Could not delete Nginx config file due to permissions: " . MFPC_NGINX_OUTPUT_FILE_PATH);
         }
     }
-    if ( file_exists( MFPC_NGINX_UPSTREAM_FILE_PATH ) ) {
-         if ( is_writable( MFPC_NGINX_UPSTREAM_FILE_PATH ) ) {
-            @wp_delete_file( MFPC_NGINX_UPSTREAM_FILE_PATH );
+    if ( $wp_filesystem->exists( MFPC_NGINX_UPSTREAM_FILE_PATH ) ) {
+         if ( $wp_filesystem->is_writable( MFPC_NGINX_UPSTREAM_FILE_PATH ) ) {
+            $wp_filesystem->delete( MFPC_NGINX_UPSTREAM_FILE_PATH );
         } else {
              mfpc_log("MFPC Uninstall: Could not delete Nginx upstream config file due to permissions: " . MFPC_NGINX_UPSTREAM_FILE_PATH);
         }

@@ -2,8 +2,8 @@
 Contributors: erwinlomibao
 Tags: cache, memcached, performance, full page cache, optimization
 Requires at least: 5.0
-Tested up to: 6.7
-Stable tag: 1.6.0
+Tested up to: 6.9
+Stable tag: 1.7.0
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -50,6 +50,12 @@ Yes, this plugin requires the `memcached` extension to be installed on your serv
 1. Main configuration dashboard showing settings and stats.
 
 == Changelog ==
+
+= 1.7.0 =
+* Fixed Plugin Check compliance.
+* Added missing sanitization and escaping for server variables and admin outputs.
+* Refactored uninstall routine to use WP_Filesystem API.
+* Updated "Tested up to" version to 6.9.
 
 = 1.6.0 =
 * Added Asset Minification (HTML, CSS, JS).
